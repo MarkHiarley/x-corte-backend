@@ -2,7 +2,6 @@ import { FastifyInstance } from 'fastify';
 import { bookingService } from '../services/bookingService.js';
 
 export async function availabilityRoutes(fastify: FastifyInstance) {
-  // GET /availability/slots - Verificar horários disponíveis
   fastify.get('/availability/slots', {
     schema: {
       tags: ['Availability'],
@@ -52,7 +51,6 @@ export async function availabilityRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // POST /availability/check - Verificar se um horário específico está disponível
   fastify.post('/availability/check', {
     schema: {
       tags: ['Availability'],

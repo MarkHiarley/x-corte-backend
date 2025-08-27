@@ -2,7 +2,6 @@ import { FastifyInstance } from 'fastify';
 import { enterpriseService } from '../services/enterpriseService.js';
 
 export async function enterpriseRoutes(fastify: FastifyInstance) {
-  // GET /enterprises - Listar todas as empresas
   fastify.get('/enterprises', {
     schema: {
       tags: ['Enterprises'],
@@ -34,7 +33,6 @@ export async function enterpriseRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // GET /enterprises/:email - Buscar dados da empresa
   fastify.get('/enterprises/:email', {
     schema: {
       tags: ['Enterprises'],
@@ -82,7 +80,6 @@ export async function enterpriseRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // POST /enterprises - Criar empresa
   fastify.post('/enterprises', {
     schema: {
       tags: ['Enterprises'],
@@ -102,7 +99,6 @@ export async function enterpriseRoutes(fastify: FastifyInstance) {
     try {
       const body = request.body as any;
 
-      // TODO: Implementar lógica de criação de empresa
       return {
         success: true,
         data: { ...body },
@@ -118,7 +114,6 @@ export async function enterpriseRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // PUT /enterprises/:email - Atualizar empresa
   fastify.put('/enterprises/:email', {
     schema: {
       tags: ['Enterprises'],
@@ -144,7 +139,6 @@ export async function enterpriseRoutes(fastify: FastifyInstance) {
       const { email } = request.params as { email: string };
       const body = request.body as any;
 
-      // TODO: Implementar lógica de atualização de empresa
       return {
         success: true,
         data: { email, ...body },

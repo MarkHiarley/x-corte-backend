@@ -1,8 +1,8 @@
 import { FastifyInstance } from 'fastify';
 import { productService } from '../services/productService.js';
+import { authenticate, requireAdmin } from '../middleware/auth.js';
 
 export async function productRoutes(fastify: FastifyInstance) {
-  // GET /products - Listar produtos
   fastify.get('/products', {
     schema: {
       tags: ['Products'],
@@ -49,8 +49,8 @@ export async function productRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // POST /products - Criar produto
   fastify.post('/products', {
+    preHandler: [authenticate, requireAdmin],
     schema: {
       tags: ['Products'],
       description: 'Criar um novo produto',
@@ -72,7 +72,6 @@ export async function productRoutes(fastify: FastifyInstance) {
     try {
       const body = request.body as any;
 
-      // Validação básica
       if (!body.enterpriseEmail || !body.name || !body.price || !body.duration) {
         return reply.status(400).send({
           success: false,
@@ -80,7 +79,6 @@ export async function productRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // Validar tipos
       if (typeof body.price !== 'number' || body.price <= 0) {
         return reply.status(400).send({
           success: false,
@@ -95,7 +93,6 @@ export async function productRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // Criar produto no Firestore
       const result = await productService.createProduct(
         body.enterpriseEmail,
         {
@@ -131,8 +128,8 @@ export async function productRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // PUT /products/:id - Atualizar produto
   fastify.put('/products/:id', {
+    preHandler: [authenticate, requireAdmin],
     schema: {
       tags: ['Products'],
       description: 'Atualizar um produto',
@@ -169,7 +166,7 @@ export async function productRoutes(fastify: FastifyInstance) {
         });
       }
 
-      const result = await productService.updateProduct(id, body.enterpriseEmail, body);
+      const result = await productService.updateProduct(body.enterpriseEmail, id, body);
 
       if (result.success) {
         return {
@@ -194,8 +191,8 @@ export async function productRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // DELETE /products/:id - Deletar produto
   fastify.delete('/products/:id', {
+    preHandler: [authenticate, requireAdmin],
     schema: {
       tags: ['Products'],
       description: 'Deletar um produto',
@@ -250,7 +247,6 @@ export async function productRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // GET /products/active - Listar apenas produtos ativos
   fastify.get('/products/active', {
     schema: {
       tags: ['Products'],

@@ -1,10 +1,8 @@
-// Tipos para o sistema de agendamento
-
 export interface Product {
     id?: string;
     name: string;
-    price: number; // em centavos (ex: 3000 = R$ 30,00)
-    duration: number; // em minutos
+    price: number;
+    duration: number;
     description?: string;
     category?: string;
     isActive: boolean;
@@ -61,11 +59,10 @@ export interface Enterprise {
     updatedAt?: any;
 }
 
-// Utilitários para horários
 export interface AvailabilityCheck {
     date: string;
     enterpriseEmail: string;
-    duration: number; // em minutos
+    duration: number;
 }
 
 export interface AvailableSlot {

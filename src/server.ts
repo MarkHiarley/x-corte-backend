@@ -6,14 +6,13 @@ import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import dotenv from 'dotenv';
 
-// Importar rotas
 import { productRoutes } from './routes/products.js';
 import { bookingRoutes } from './routes/bookings.js';
 import { availabilityRoutes } from './routes/availability.js';
 import { enterpriseRoutes } from './routes/enterprises.js';
 import { schedulesRoutes } from './routes/schedules.js';
+import { authRoutes } from './routes/auth.js';
 
-// Carregar variáveis de ambiente
 dotenv.config();
 
 const server = Fastify({
@@ -22,9 +21,7 @@ const server = Fastify({
   }
 });
 
-// Função para configurar plugins
 async function setupPlugins() {
-  // CORS
   await server.register(cors, {
     origin: process.env.NODE_ENV === 'production' 
       ? ['https://yourdomain.com'] 
@@ -32,18 +29,15 @@ async function setupPlugins() {
     credentials: true
   });
 
-  // Helmet para segurança
   await server.register(helmet, {
     contentSecurityPolicy: false
   });
 
-  // Rate limiting
   await server.register(rateLimit, {
     max: 100,
     timeWindow: '1 minute'
   });
 
-  // Swagger para documentação
   await server.register(swagger, {
     openapi: {
       info: {
@@ -76,9 +70,7 @@ async function setupPlugins() {
   });
 }
 
-// Função para configurar rotas
 async function setupRoutes() {
-  // Rota de health check
   server.get('/health', {
     schema: {
       description: 'Health check endpoint',
@@ -101,7 +93,7 @@ async function setupRoutes() {
     };
   });
 
-  // Registrar rotas de API
+  await server.register(authRoutes, { prefix: '/api' });
   await server.register(productRoutes, { prefix: '/api' });
   await server.register(bookingRoutes, { prefix: '/api' });
   await server.register(availabilityRoutes, { prefix: '/api' });
@@ -109,7 +101,6 @@ async function setupRoutes() {
   await server.register(schedulesRoutes, { prefix: '/api' });
 }
 
-// Função principal para inicializar o servidor
 async function start() {
   try {
     await setupPlugins();
@@ -128,7 +119,6 @@ async function start() {
   }
 }
 
-// Gerenciar shutdown graceful
 process.on('SIGINT', async () => {
   console.log('Recebido SIGINT, fechando servidor...');
   await server.close();
@@ -141,5 +131,4 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-// Inicializar servidor
 start();

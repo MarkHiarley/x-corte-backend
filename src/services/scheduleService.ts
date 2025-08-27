@@ -111,7 +111,6 @@ export class ScheduleService {
 
       await updateDoc(docRef, dataToUpdate);
 
-      // Buscar o documento atualizado
       const result = await this.getScheduleById(scheduleId);
       return result;
     } catch (error: any) {

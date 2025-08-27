@@ -2,7 +2,6 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { scheduleService } from '../services/scheduleService.js';
 import { Schedule } from '../types/index.js';
 
-// Interfaces para tipagem das requisições
 interface CreateScheduleBody {
   enterpriseEmail: string;
   name: string;
@@ -28,14 +27,12 @@ interface DeleteScheduleParams {
 }
 
 export async function schedulesRoutes(fastify: FastifyInstance) {
-  // POST /schedules - Criar um novo schedule
   fastify.post<{
     Body: CreateScheduleBody;
   }>('/schedules', async (request: FastifyRequest<{ Body: CreateScheduleBody }>, reply: FastifyReply) => {
     try {
       const { enterpriseEmail, name, timeZone, availability, isDefault } = request.body;
       
-      // Validação básica
       if (!enterpriseEmail || !name || !timeZone || !availability) {
         return reply.status(400).send({
           success: false,
@@ -43,7 +40,6 @@ export async function schedulesRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // Validar se availability é um array
       if (!Array.isArray(availability)) {
         return reply.status(400).send({
           success: false,
@@ -51,7 +47,6 @@ export async function schedulesRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // Criar schedule no Firestore para a empresa
       const result = await scheduleService.createSchedule(enterpriseEmail, {
         name,
         timeZone,
@@ -81,7 +76,6 @@ export async function schedulesRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // GET /schedules - Buscar todos os schedules de uma empresa
   fastify.get<{
     Querystring: GetSchedulesQuery;
   }>('/schedules', async (request: FastifyRequest<{ Querystring: GetSchedulesQuery }>, reply: FastifyReply) => {
@@ -117,7 +111,6 @@ export async function schedulesRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // GET /schedules/:id - Buscar um schedule específico
   fastify.get<{
     Params: { id: string };
   }>('/schedules/:id', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
@@ -146,7 +139,6 @@ export async function schedulesRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // PUT /schedules/:id - Atualizar um schedule
   fastify.put<{
     Params: UpdateScheduleParams;
     Body: Partial<Schedule>;
@@ -155,7 +147,6 @@ export async function schedulesRoutes(fastify: FastifyInstance) {
       const { id } = request.params;
       const updateData = request.body;
 
-      // Remover campos que não devem ser atualizados diretamente
       delete updateData.id;
       delete updateData.createdAt;
 
@@ -182,7 +173,6 @@ export async function schedulesRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // DELETE /schedules/:id - Deletar um schedule
   fastify.delete<{
     Params: DeleteScheduleParams;
   }>('/schedules/:id', async (request: FastifyRequest<{ Params: DeleteScheduleParams }>, reply: FastifyReply) => {
@@ -211,7 +201,6 @@ export async function schedulesRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // GET /schedules/default/:enterpriseEmail - Buscar schedule padrão de uma empresa
   fastify.get<{
     Params: { enterpriseEmail: string };
   }>('/schedules/default/:enterpriseEmail', async (request: FastifyRequest<{ Params: { enterpriseEmail: string } }>, reply: FastifyReply) => {

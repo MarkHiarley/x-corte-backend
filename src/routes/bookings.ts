@@ -2,7 +2,6 @@ import { FastifyInstance } from 'fastify';
 import { bookingService } from '../services/bookingService.js';
 
 export async function bookingRoutes(fastify: FastifyInstance) {
-  // GET /bookings - Listar agendamentos
   fastify.get('/bookings', {
     schema: {
       tags: ['Bookings'],
@@ -51,7 +50,6 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // POST /bookings - Criar agendamento
   fastify.post('/bookings', {
     schema: {
       tags: ['Bookings'],
@@ -111,7 +109,6 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // PUT /bookings/:id/confirm - Confirmar agendamento
   fastify.put('/bookings/:id/confirm', {
     schema: {
       tags: ['Bookings'],
