@@ -1,0 +1,46 @@
+{
+  "name": "x-corte-backend",
+  "version": "1.0.0",
+  "description": "Sistema de gestão de barbearia com agendamentos e produtos",
+  "main": "dist/server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "check-config": "tsx src/utils/checkConfig.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MarkHiarley/x-corte-backend.git"
+  },
+  "keywords": [
+    "fastify",
+    "typescript",
+    "barbearia",
+    "agendamento",
+    "produtos"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MarkHiarley/x-corte-backend/issues"
+  },
+  "homepage": "https://github.com/MarkHiarley/x-corte-backend#readme",
+  "dependencies": {
+    "@fastify/cors": "^10.0.1",
+    "@fastify/helmet": "^12.0.1",
+    "@fastify/rate-limit": "^10.1.1",
+    "@fastify/swagger": "^9.1.0",
+    "@fastify/swagger-ui": "^5.0.1",
+    "dotenv": "^16.4.5",
+    "fastify": "^5.5.0",
+    "firebase": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}
