@@ -1,23 +1,59 @@
 import { FastifyInstance } from 'fastify';
 import { authService } from '../services/authService.js';
 import { authenticate } from '../middleware/auth.js';
+import { userSchema, errorResponse, successResponse } from '../schemas/index.js';
 
 export async function authRoutes(fastify: FastifyInstance) {
   fastify.post('/auth/register', {
     schema: {
       tags: ['Authentication'],
-      description: 'Registrar novo usuário',
+      summary: 'Registrar novo usuário',
+      description: 'Cria uma nova conta de usuário. Para administradores, é necessário fornecer o email da empresa.',
       body: {
         type: 'object',
         properties: {
-          email: { type: 'string', format: 'email' },
-          password: { type: 'string', minLength: 6 },
-          name: { type: 'string', minLength: 2 },
-          role: { type: 'string', enum: ['admin', 'client'] },
-          enterpriseEmail: { type: 'string', format: 'email' },
-          phone: { type: 'string' }
+          email: { 
+            type: 'string', 
+            format: 'email',
+            description: 'Email do usuário'
+          },
+          password: { 
+            type: 'string', 
+            minLength: 6,
+            description: 'Senha com pelo menos 6 caracteres'
+          },
+          name: { 
+            type: 'string', 
+            minLength: 2,
+            description: 'Nome completo do usuário'
+          },
+          role: { 
+            type: 'string', 
+            enum: ['admin', 'client'],
+            description: 'Tipo de usuário'
+          },
+          enterpriseEmail: { 
+            type: 'string', 
+            format: 'email',
+            description: 'Email da empresa (obrigatório para admins)'
+          },
+          phone: { 
+            type: 'string',
+            description: 'Telefone de contato'
+          }
         },
         required: ['email', 'password', 'name', 'role']
+      },
+      response: {
+        201: {
+          ...successResponse,
+          properties: {
+            ...successResponse.properties,
+            data: userSchema
+          }
+        },
+        400: errorResponse,
+        500: errorResponse
       }
     }
   }, async (request, reply) => {
@@ -58,14 +94,40 @@ export async function authRoutes(fastify: FastifyInstance) {
   fastify.post('/auth/login', {
     schema: {
       tags: ['Authentication'],
-      description: 'Fazer login',
+      summary: 'Fazer login',
+      description: 'Autentica o usuário e retorna token de acesso',
       body: {
         type: 'object',
         properties: {
-          email: { type: 'string', format: 'email' },
-          password: { type: 'string' }
+          email: { 
+            type: 'string', 
+            format: 'email',
+            description: 'Email do usuário' 
+          },
+          password: { 
+            type: 'string',
+            description: 'Senha do usuário'
+          }
         },
         required: ['email', 'password']
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: true },
+            message: { type: 'string' },
+            data: {
+              type: 'object',
+              properties: {
+                user: userSchema,
+                token: { type: 'string', description: 'Token JWT' }
+              }
+            }
+          }
+        },
+        401: errorResponse,
+        500: errorResponse
       }
     }
   }, async (request, reply) => {
@@ -99,14 +161,20 @@ export async function authRoutes(fastify: FastifyInstance) {
   fastify.get('/auth/profile', {
     preHandler: [authenticate],
     schema: {
-      tags: ['Auth'],
-      description: 'Obter perfil do usuário autenticado',
-      headers: {
-        type: 'object',
-        properties: {
-          authorization: { type: 'string' }
+      tags: ['Authentication'],
+      summary: 'Obter perfil do usuário',
+      description: 'Retorna os dados do usuário autenticado',
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: {
+          ...successResponse,
+          properties: {
+            ...successResponse.properties,
+            data: userSchema
+          }
         },
-        required: ['authorization']
+        401: errorResponse,
+        500: errorResponse
       }
     }
   }, async (request: any) => {
@@ -119,8 +187,12 @@ export async function authRoutes(fastify: FastifyInstance) {
 
   fastify.post('/auth/logout', {
     schema: {
-      tags: ['Auth'],
-      description: 'Realizar logout'
+      tags: ['Authentication'],
+      summary: 'Realizar logout',
+      description: 'Encerra a sessão do usuário',
+      response: {
+        200: successResponse
+      }
     }
   }, async () => {
     return {
@@ -132,13 +204,28 @@ export async function authRoutes(fastify: FastifyInstance) {
   fastify.get('/auth/profile/:uid', {
     schema: {
       tags: ['Authentication'],
-      description: 'Buscar perfil do usuário',
+      summary: 'Buscar perfil por ID',
+      description: 'Retorna os dados públicos de um usuário específico',
       params: {
         type: 'object',
         properties: {
-          uid: { type: 'string' }
+          uid: { 
+            type: 'string',
+            description: 'ID único do usuário'
+          }
         },
         required: ['uid']
+      },
+      response: {
+        200: {
+          ...successResponse,
+          properties: {
+            ...successResponse.properties,
+            data: userSchema
+          }
+        },
+        404: errorResponse,
+        500: errorResponse
       }
     }
   }, async (request, reply) => {

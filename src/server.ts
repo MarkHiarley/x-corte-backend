@@ -42,21 +42,36 @@ async function setupPlugins() {
     openapi: {
       info: {
         title: 'X-Corte API',
-        description: 'API para sistema de gestão de barbearia',
-        version: '1.0.0'
+        description: 'API completa para sistema de gestão de barbearias com agendamentos, produtos e usuários',
+        version: '1.0.0',
+        contact: {
+          name: 'Equipe X-Corte',
+          email: 'contato@x-corte.com'
+        }
       },
       servers: [
         {
-          url: 'http://localhost:3000',
-          description: 'Servidor de desenvolvimento'
+          url: process.env.NODE_ENV === 'production' ? 'https://api.x-corte.com' : 'http://localhost:5000',
+          description: process.env.NODE_ENV === 'production' ? 'Servidor de produção' : 'Servidor de desenvolvimento'
         }
       ],
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'JWT'
+          }
+        }
+      },
       tags: [
-        { name: 'Products', description: 'Operações relacionadas a produtos/serviços' },
-        { name: 'Bookings', description: 'Operações relacionadas a agendamentos' },
-        { name: 'Availability', description: 'Operações relacionadas a disponibilidade' },
-        { name: 'Enterprises', description: 'Operações relacionadas a empresas' },
-        { name: 'Schedules', description: 'Operações relacionadas a horários de funcionamento' }
+        { name: 'Authentication', description: 'Autenticação e autorização de usuários' },
+        { name: 'Products', description: 'Gerenciamento de produtos e serviços' },
+        { name: 'Bookings', description: 'Sistema de agendamentos' },
+        { name: 'Availability', description: 'Consulta de disponibilidade' },
+        { name: 'Enterprises', description: 'Gerenciamento de empresas/barbearias' },
+        { name: 'Schedules', description: 'Horários de funcionamento' },
+        { name: 'Health', description: 'Status e saúde da aplicação' }
       ]
     }
   });
@@ -64,23 +79,34 @@ async function setupPlugins() {
   await server.register(swaggerUi, {
     routePrefix: '/docs',
     uiConfig: {
-      docExpansion: 'full',
-      deepLinking: false
-    }
+      docExpansion: 'list',
+      deepLinking: false,
+      defaultModelsExpandDepth: 1,
+      defaultModelExpandDepth: 1,
+      displayOperationId: false,
+      showExtensions: false,
+      showCommonExtensions: false,
+      useUnsafeMarkdown: false
+    },
+    staticCSP: true,
+    transformStaticCSP: (header: string) => header
   });
 }
 
 async function setupRoutes() {
   server.get('/health', {
     schema: {
-      description: 'Health check endpoint',
+      tags: ['Health'],
+      description: 'Verificação de saúde da aplicação',
+      summary: 'Health Check',
       response: {
         200: {
           type: 'object',
           properties: {
-            status: { type: 'string' },
-            timestamp: { type: 'string' },
-            uptime: { type: 'number' }
+            status: { type: 'string', example: 'OK' },
+            timestamp: { type: 'string', format: 'date-time' },
+            uptime: { type: 'number', description: 'Tempo de atividade em segundos' },
+            version: { type: 'string', example: '1.0.0' }
           }
         }
       }
@@ -89,7 +115,8 @@ async function setupRoutes() {
     return {
       status: 'OK',
       timestamp: new Date().toISOString(),
-      uptime: process.uptime()
+      uptime: process.uptime(),
+      version: '1.0.0'
     };
   });
 

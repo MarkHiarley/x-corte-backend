@@ -1,18 +1,46 @@
 import { FastifyInstance } from 'fastify';
 import { productService } from '../services/productService.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
+import { productSchema, errorResponse } from '../schemas/index.js';
 
 export async function productRoutes(fastify: FastifyInstance) {
   fastify.get('/products', {
     schema: {
       tags: ['Products'],
-      description: 'Listar produtos de uma empresa',
+      summary: 'Listar produtos',
+      description: 'Retorna todos os produtos ativos de uma empresa específica',
       querystring: {
         type: 'object',
         properties: {
-          enterpriseEmail: { type: 'string' }
+          enterpriseEmail: { 
+            type: 'string',
+            format: 'email',
+            description: 'Email da empresa para buscar produtos'
+          },
+          category: {
+            type: 'string',
+            description: 'Filtrar por categoria'
+          },
+          active: {
+            type: 'boolean',
+            description: 'Filtrar produtos ativos/inativos'
+          }
         },
         required: ['enterpriseEmail']
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: true },
+            data: {
+              type: 'array',
+              items: productSchema
+            }
+          }
+        },
+        400: errorResponse,
+        500: errorResponse
       }
     }
   }, async (request, reply) => {
