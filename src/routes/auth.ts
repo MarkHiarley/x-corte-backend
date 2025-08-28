@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { authService } from '../services/authService.js';
 import { authenticate } from '../middleware/auth.js';
-import { userSchema, errorResponse, successResponse } from '../schemas/index.js';
+import { userSchema, responses } from '../schemas/index.js';
 
 export async function authRoutes(fastify: FastifyInstance) {
   fastify.post('/auth/register', {
@@ -46,14 +46,17 @@ export async function authRoutes(fastify: FastifyInstance) {
       },
       response: {
         201: {
-          ...successResponse,
+          ...responses[201],
           properties: {
-            ...successResponse.properties,
+            ...responses[201].properties,
             data: userSchema
           }
         },
-        400: errorResponse,
-        500: errorResponse
+        400: responses[400],
+        409: responses[409],
+        422: responses[422],
+        500: responses[500],
+        502: responses[502]
       }
     }
   }, async (request, reply) => {
@@ -113,10 +116,9 @@ export async function authRoutes(fastify: FastifyInstance) {
       },
       response: {
         200: {
-          type: 'object',
+          ...responses[200],
           properties: {
-            success: { type: 'boolean', example: true },
-            message: { type: 'string' },
+            ...responses[200].properties,
             data: {
               type: 'object',
               properties: {
@@ -126,8 +128,11 @@ export async function authRoutes(fastify: FastifyInstance) {
             }
           }
         },
-        401: errorResponse,
-        500: errorResponse
+        400: responses[400],
+        401: responses[401],
+        422: responses[422],
+        500: responses[500],
+        502: responses[502]
       }
     }
   }, async (request, reply) => {
@@ -167,14 +172,16 @@ export async function authRoutes(fastify: FastifyInstance) {
       security: [{ bearerAuth: [] }],
       response: {
         200: {
-          ...successResponse,
+          ...responses[200],
           properties: {
-            ...successResponse.properties,
+            ...responses[200].properties,
             data: userSchema
           }
         },
-        401: errorResponse,
-        500: errorResponse
+        401: responses[401],
+        403: responses[403],
+        500: responses[500],
+        502: responses[502]
       }
     }
   }, async (request: any) => {
@@ -191,7 +198,9 @@ export async function authRoutes(fastify: FastifyInstance) {
       summary: 'Realizar logout',
       description: 'Encerra a sessão do usuário',
       response: {
-        200: successResponse
+        200: responses[200],
+        401: responses[401],
+        500: responses[500]
       }
     }
   }, async () => {
@@ -218,14 +227,15 @@ export async function authRoutes(fastify: FastifyInstance) {
       },
       response: {
         200: {
-          ...successResponse,
+          ...responses[200],
           properties: {
-            ...successResponse.properties,
+            ...responses[200].properties,
             data: userSchema
           }
         },
-        404: errorResponse,
-        500: errorResponse
+        404: responses[404],
+        500: responses[500],
+        502: responses[502]
       }
     }
   }, async (request, reply) => {

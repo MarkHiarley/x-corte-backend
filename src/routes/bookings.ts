@@ -1,19 +1,49 @@
 import { FastifyInstance } from 'fastify';
 import { bookingService } from '../services/bookingService.js';
+import { bookingSchema, responses } from '../schemas/index.js';
 
 export async function bookingRoutes(fastify: FastifyInstance) {
   fastify.get('/bookings', {
     schema: {
       tags: ['Bookings'],
-      description: 'Listar agendamentos de uma empresa',
+      summary: 'Listar agendamentos',
+      description: 'Retorna todos os agendamentos de uma empresa, com filtros opcionais por data e status.',
       querystring: {
-        type: 'object',
-        properties: {
-          enterpriseEmail: { type: 'string' },
-          date: { type: 'string' },
-          status: { type: 'string' }
+          type: 'object',
+          properties: {
+            enterpriseEmail: { 
+              type: 'string',
+              format: 'email',
+              description: 'Email da empresa'
+            },
+            date: { 
+              type: 'string',
+              format: 'date',
+              description: 'Filtrar por data específica (YYYY-MM-DD)'
+            },
+            status: { 
+              type: 'string',
+              enum: ['pending', 'confirmed', 'cancelled', 'completed'],
+              description: 'Filtrar por status do agendamento'
+            }
+          },
+          required: ['enterpriseEmail']
         },
-        required: ['enterpriseEmail']
+      response: {
+        200: {
+          ...responses[200],
+          properties: {
+            ...responses[200].properties,
+            data: {
+              type: 'array',
+              items: bookingSchema
+            }
+          }
+        },
+        400: responses[400],
+        422: responses[422],
+        500: responses[500],
+        502: responses[502]
       }
     }
   }, async (request, reply) => {
@@ -67,6 +97,19 @@ export async function bookingRoutes(fastify: FastifyInstance) {
           notes: { type: 'string' }
         },
         required: ['enterpriseEmail', 'clientName', 'clientPhone', 'productId', 'date', 'startTime']
+      },
+      response: {
+        201: {
+          ...responses[201],
+          properties: {
+            ...responses[201].properties,
+            data: bookingSchema
+          }
+        },
+        400: responses[400],
+        422: responses[422],
+        500: responses[500],
+        502: responses[502]
       }
     }
   }, async (request, reply) => {
@@ -126,6 +169,14 @@ export async function bookingRoutes(fastify: FastifyInstance) {
           enterpriseEmail: { type: 'string' }
         },
         required: ['enterpriseEmail']
+      },
+      response: {
+        200: responses[200],
+        400: responses[400],
+        404: responses[404],
+        422: responses[422],
+        500: responses[500],
+        502: responses[502]
       }
     }
   }, async (request, reply) => {

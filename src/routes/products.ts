@@ -1,14 +1,14 @@
 import { FastifyInstance } from 'fastify';
 import { productService } from '../services/productService.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
-import { productSchema, errorResponse } from '../schemas/index.js';
+import { productSchema, responses } from '../schemas/index.js';
 
 export async function productRoutes(fastify: FastifyInstance) {
   fastify.get('/products', {
     schema: {
       tags: ['Products'],
-      summary: 'Listar produtos',
-      description: 'Retorna todos os produtos ativos de uma empresa específica',
+      summary: 'Listar produtos/serviços',
+      description: 'Retorna todos os produtos/serviços ativos de uma empresa específica. Usado pelo frontend para exibir catálogo de serviços.',
       querystring: {
         type: 'object',
         properties: {
@@ -19,28 +19,30 @@ export async function productRoutes(fastify: FastifyInstance) {
           },
           category: {
             type: 'string',
-            description: 'Filtrar por categoria'
+            description: 'Filtrar por categoria (opcional)'
           },
           active: {
             type: 'boolean',
-            description: 'Filtrar produtos ativos/inativos'
+            description: 'Filtrar produtos ativos/inativos (opcional)'
           }
         },
         required: ['enterpriseEmail']
       },
       response: {
         200: {
-          type: 'object',
+          ...responses[200],
           properties: {
-            success: { type: 'boolean', example: true },
+            ...responses[200].properties,
             data: {
               type: 'array',
               items: productSchema
             }
           }
         },
-        400: errorResponse,
-        500: errorResponse
+        400: responses[400],
+        422: responses[422],
+        500: responses[500],
+        502: responses[502]
       }
     }
   }, async (request, reply) => {
@@ -81,19 +83,60 @@ export async function productRoutes(fastify: FastifyInstance) {
     preHandler: [authenticate, requireAdmin],
     schema: {
       tags: ['Products'],
-      description: 'Criar um novo produto',
+      summary: 'Criar produto/serviço',
+      description: 'Cria um novo produto/serviço na empresa. Apenas administradores podem criar produtos.',
+      security: [{ bearerAuth: [] }],
       body: {
-        type: 'object',
-        properties: {
-          enterpriseEmail: { type: 'string' },
-          name: { type: 'string' },
-          price: { type: 'number' },
-          duration: { type: 'number' },
-          description: { type: 'string' },
-          category: { type: 'string' },
-          isActive: { type: 'boolean' }
+          type: 'object',
+          properties: {
+            enterpriseEmail: { 
+              type: 'string',
+              format: 'email',
+              description: 'Email da empresa'
+            },
+            name: { 
+              type: 'string',
+              description: 'Nome do produto/serviço'
+            },
+            price: { 
+              type: 'number',
+              minimum: 0,
+              description: 'Preço em reais'
+            },
+            duration: { 
+              type: 'number',
+              minimum: 1,
+              description: 'Duração em minutos'
+            },
+            description: { 
+              type: 'string',
+              description: 'Descrição detalhada do serviço'
+            },
+            category: { 
+              type: 'string',
+              description: 'Categoria do serviço'
+            },
+            isActive: { 
+              type: 'boolean',
+              description: 'Se o produto está ativo'
+            }
+          },
+          required: ['enterpriseEmail', 'name', 'price', 'duration']
         },
-        required: ['enterpriseEmail', 'name', 'price', 'duration']
+      response: {
+        201: {
+          ...responses[201],
+          properties: {
+            ...responses[201].properties,
+            data: productSchema
+          }
+        },
+        400: responses[400],
+        401: responses[401],
+        403: responses[403],
+        422: responses[422],
+        500: responses[500],
+        502: responses[502]
       }
     }
   }, async (request, reply) => {

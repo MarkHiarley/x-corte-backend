@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { scheduleService } from '../services/scheduleService.js';
 import { Schedule } from '../types/index.js';
+import { scheduleSchema, responses } from '../schemas/index.js';
 
 interface CreateScheduleBody {
   enterpriseEmail: string;
@@ -29,7 +30,77 @@ interface DeleteScheduleParams {
 export async function schedulesRoutes(fastify: FastifyInstance) {
   fastify.post<{
     Body: CreateScheduleBody;
-  }>('/schedules', async (request: FastifyRequest<{ Body: CreateScheduleBody }>, reply: FastifyReply) => {
+  }>('/schedules', {
+    schema: {
+      tags: ['Schedules'],
+      summary: 'Criar horário de funcionamento',
+      description: 'Cria um novo horário de funcionamento para uma empresa com disponibilidade semanal configurável.',
+      body: {
+        type: 'object',
+        properties: {
+          enterpriseEmail: {
+            type: 'string',
+            format: 'email',
+            description: 'Email da empresa'
+          },
+          name: {
+            type: 'string',
+            description: 'Nome identificador do horário'
+          },
+          timeZone: {
+            type: 'string',
+            description: 'Fuso horário'
+          },
+          availability: {
+            type: 'array',
+            description: 'Configuração de disponibilidade por período',
+            items: {
+              type: 'object',
+              properties: {
+                days: {
+                  type: 'array',
+                  items: {
+                    type: 'string',
+                    enum: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+                  },
+                  description: 'Dias da semana para este horário'
+                },
+                startTime: {
+                  type: 'string',
+                  pattern: '^\\d{2}:\\d{2}$',
+                  description: 'Horário de abertura (HH:MM)'
+                },
+                endTime: {
+                  type: 'string',
+                  pattern: '^\\d{2}:\\d{2}$',
+                  description: 'Horário de fechamento (HH:MM)'
+                }
+              },
+              required: ['days', 'startTime', 'endTime']
+            }
+          },
+          isDefault: {
+            type: 'boolean',
+            description: 'Se este é o horário padrão da empresa'
+          }
+        },
+        required: ['enterpriseEmail', 'name', 'timeZone', 'availability']
+      },
+      response: {
+        201: {
+          ...responses[201],
+          properties: {
+            ...responses[201].properties,
+            data: scheduleSchema
+          }
+        },
+        400: responses[400],
+        422: responses[422],
+        500: responses[500],
+        502: responses[502]
+      }
+    }
+  }, async (request: FastifyRequest<{ Body: CreateScheduleBody }>, reply: FastifyReply) => {
     try {
       const { enterpriseEmail, name, timeZone, availability, isDefault } = request.body;
       
@@ -78,7 +149,39 @@ export async function schedulesRoutes(fastify: FastifyInstance) {
 
   fastify.get<{
     Querystring: GetSchedulesQuery;
-  }>('/schedules', async (request: FastifyRequest<{ Querystring: GetSchedulesQuery }>, reply: FastifyReply) => {
+  }>('/schedules', {
+    schema: {
+      tags: ['Schedules'],
+      summary: 'Listar horários de funcionamento',
+      description: 'Retorna todos os horários de funcionamento de uma empresa',
+      querystring: {
+        type: 'object',
+        properties: {
+          enterpriseEmail: { 
+            type: 'string',
+            format: 'email',
+            description: 'Email da empresa'
+          }
+        },
+        required: ['enterpriseEmail']
+      },
+      response: {
+        200: {
+          ...responses[200],
+          properties: {
+            ...responses[200].properties,
+            data: {
+              type: 'array',
+              items: scheduleSchema
+            }
+          }
+        },
+        400: responses[400],
+        500: responses[500],
+        502: responses[502]
+      }
+    }
+  }, async (request: FastifyRequest<{ Querystring: GetSchedulesQuery }>, reply: FastifyReply) => {
     try {
       const { enterpriseEmail } = request.query;
       
@@ -113,7 +216,35 @@ export async function schedulesRoutes(fastify: FastifyInstance) {
 
   fastify.get<{
     Params: { id: string };
-  }>('/schedules/:id', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  }>('/schedules/:id', {
+    schema: {
+      tags: ['Schedules'],
+      summary: 'Obter horário por ID',
+      description: 'Retorna um horário de funcionamento específico pelo ID',
+      params: {
+        type: 'object',
+        properties: {
+          id: { 
+            type: 'string',
+            description: 'ID do horário'
+          }
+        },
+        required: ['id']
+      },
+      response: {
+        200: {
+          ...responses[200],
+          properties: {
+            ...responses[200].properties,
+            data: scheduleSchema
+          }
+        },
+        404: responses[404],
+        500: responses[500],
+        502: responses[502]
+      }
+    }
+  }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     try {
       const { id } = request.params;
 
@@ -142,7 +273,37 @@ export async function schedulesRoutes(fastify: FastifyInstance) {
   fastify.put<{
     Params: UpdateScheduleParams;
     Body: Partial<Schedule>;
-  }>('/schedules/:id', async (request: FastifyRequest<{ Params: UpdateScheduleParams; Body: Partial<Schedule> }>, reply: FastifyReply) => {
+  }>('/schedules/:id', {
+    schema: {
+      tags: ['Schedules'],
+      summary: 'Atualizar horário',
+      description: 'Atualiza um horário de funcionamento existente',
+      params: {
+        type: 'object',
+        properties: {
+          id: { 
+            type: 'string',
+            description: 'ID do horário'
+          }
+        },
+        required: ['id']
+      },
+      response: {
+        200: {
+          ...responses[200],
+          properties: {
+            ...responses[200].properties,
+            data: scheduleSchema
+          }
+        },
+        400: responses[400],
+        404: responses[404],
+        422: responses[422],
+        500: responses[500],
+        502: responses[502]
+      }
+    }
+  }, async (request: FastifyRequest<{ Params: UpdateScheduleParams; Body: Partial<Schedule> }>, reply: FastifyReply) => {
     try {
       const { id } = request.params;
       const updateData = request.body;
@@ -175,7 +336,29 @@ export async function schedulesRoutes(fastify: FastifyInstance) {
 
   fastify.delete<{
     Params: DeleteScheduleParams;
-  }>('/schedules/:id', async (request: FastifyRequest<{ Params: DeleteScheduleParams }>, reply: FastifyReply) => {
+  }>('/schedules/:id', {
+    schema: {
+      tags: ['Schedules'],
+      summary: 'Deletar horário',
+      description: 'Remove um horário de funcionamento',
+      params: {
+        type: 'object',
+        properties: {
+          id: { 
+            type: 'string',
+            description: 'ID do horário'
+          }
+        },
+        required: ['id']
+      },
+      response: {
+        200: responses[200],
+        404: responses[404],
+        500: responses[500],
+        502: responses[502]
+      }
+    }
+  }, async (request: FastifyRequest<{ Params: DeleteScheduleParams }>, reply: FastifyReply) => {
     try {
       const { id } = request.params;
 

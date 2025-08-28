@@ -1,19 +1,55 @@
 import { FastifyInstance } from 'fastify';
 import { bookingService } from '../services/bookingService.js';
+import { responses } from '../schemas/index.js';
 
 export async function availabilityRoutes(fastify: FastifyInstance) {
   fastify.get('/availability/slots', {
     schema: {
       tags: ['Availability'],
-      description: 'Verificar horários disponíveis para agendamento',
+      summary: 'Consultar horários disponíveis',
+      description: 'Retorna os horários disponíveis para agendamento em uma data específica, considerando a duração do serviço e agendamentos existentes.',
       querystring: {
-        type: 'object',
-        properties: {
-          enterpriseEmail: { type: 'string' },
-          date: { type: 'string' },
-          duration: { type: 'number' }
+          type: 'object',
+          properties: {
+            enterpriseEmail: { 
+              type: 'string',
+              format: 'email',
+              description: 'Email da empresa'
+            },
+            date: { 
+              type: 'string',
+              format: 'date',
+              description: 'Data para consulta (YYYY-MM-DD)'
+            },
+            duration: { 
+              type: 'number',
+              minimum: 1,
+              description: 'Duração do serviço em minutos'
+            }
+          },
+          required: ['enterpriseEmail', 'date', 'duration']
         },
-        required: ['enterpriseEmail', 'date', 'duration']
+      response: {
+        200: {
+          ...responses[200],
+          properties: {
+            ...responses[200].properties,
+            data: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  time: { type: 'string' },
+                  available: { type: 'boolean' }
+                }
+              }
+            }
+          }
+        },
+        400: responses[400],
+        422: responses[422],
+        500: responses[500],
+        502: responses[502]
       }
     }
   }, async (request, reply) => {
@@ -64,6 +100,28 @@ export async function availabilityRoutes(fastify: FastifyInstance) {
           duration: { type: 'number' }
         },
         required: ['enterpriseEmail', 'date', 'startTime', 'duration']
+      },
+      response: {
+        200: {
+          ...responses[200],
+          properties: {
+            ...responses[200].properties,
+            data: {
+              type: 'object',
+              properties: {
+                isAvailable: { type: 'boolean' },
+                conflictingBooking: { 
+                  type: 'object',
+                  nullable: true
+                }
+              }
+            }
+          }
+        },
+        400: responses[400],
+        422: responses[422],
+        500: responses[500],
+        502: responses[502]
       }
     }
   }, async (request, reply) => {
