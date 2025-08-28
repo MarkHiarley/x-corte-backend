@@ -82,14 +82,9 @@ async function setupPlugins() {
       docExpansion: 'list',
       deepLinking: false,
       defaultModelsExpandDepth: 1,
-      defaultModelExpandDepth: 1,
-      displayOperationId: false,
-      showExtensions: false,
-      showCommonExtensions: false,
-      useUnsafeMarkdown: false
+      defaultModelExpandDepth: 1
     },
-    staticCSP: true,
-    transformStaticCSP: (header: string) => header
+    staticCSP: false
   });
 }
 
