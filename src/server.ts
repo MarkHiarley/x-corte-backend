@@ -12,6 +12,8 @@ import { availabilityRoutes } from './routes/availability.js';
 import { enterpriseRoutes } from './routes/enterprises.js';
 import { schedulesRoutes } from './routes/schedules.js';
 import { authRoutes } from './routes/auth.js';
+import { employeeRoutes } from './routes/employees.js';
+import { employeeAvailabilityRoutes } from './routes/employeeAvailability.js';
 
 dotenv.config();
 
@@ -121,6 +123,8 @@ async function setupRoutes() {
   await server.register(availabilityRoutes, { prefix: '/api' });
   await server.register(enterpriseRoutes, { prefix: '/api' });
   await server.register(schedulesRoutes, { prefix: '/api' });
+  await server.register(employeeRoutes, { prefix: '/api' });
+  await server.register(employeeAvailabilityRoutes, { prefix: '/api' });
 }
 
 async function start() {

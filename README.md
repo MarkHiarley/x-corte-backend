@@ -1,6 +1,6 @@
-# X-Corte Backend
+# 💈 X-Corte Backend
 
-API REST para sistema de gestão de barbearias com multi-tenancy.
+Sistema completo de gestão para barbearias com multi-tenancy, funcionários e agendamentos.
 
 ## 🚀 Deploy Rápido
 
@@ -26,76 +26,142 @@ API REST para sistema de gestão de barbearias com multi-tenancy.
    - Documentação: http://localhost:5000/docs
    - Health Check: http://localhost:5000/health
 
-### Deploy Manual
+## 📋 Principais Funcionalidades
 
-```bash
-# Build da imagem
-docker build -t x-corte-backend .
+### 🏢 Multi-Tenancy
+- Cada empresa tem seus dados isolados
+- Funcionários específicos por empresa
+- Agendamentos separados por empresa
 
-# Executar container
-docker run -d \
-  --name x-corte-backend \
-  -p 5000:5000 \
-  --env-file .env \
-  --restart unless-stopped \
-  x-corte-backend
+### 👥 Gestão de Funcionários
+- CRUD completo de funcionários
+- Sistema de habilidades/especialidades
+- Horários de trabalho personalizados
+- Controle de status ativo/inativo
+
+### 📅 Sistema de Agendamentos
+- Agendamento com funcionário específico
+- Verificação automática de disponibilidade
+- Duração personalizada por serviço/funcionário
+- Prevenção de conflitos de horário
+
+### ⚡ Performance Otimizada
+- Cache inteligente com TTL otimizado
+- Consultas eficientes no Firestore
+- Invalidação automática do cache
+- Respostas mínimas e rápidas
+
+## 🔐 Autenticação
+
+Todas as rotas são protegidas por JWT. Header necessário:
+```
+Authorization: Bearer <seu-token-jwt>
 ```
 
-## 📋 Principais Endpoints
+## 📡 Principais Endpoints
 
-### Autenticação
-- `POST /api/auth/register` - Registrar usuário
-- `POST /api/auth/login` - Fazer login
-- `POST /api/auth/logout` - Fazer logout
+### 👥 Funcionários
+```bash
+# Listar funcionários da empresa
+GET /api/employees?enterpriseEmail=empresa@exemplo.com
 
-### Produtos/Serviços
-- `GET /api/products` - Listar produtos
-- `POST /api/products` - Criar produto (admin)
-- `PUT /api/products/:id` - Atualizar produto (admin)
-- `DELETE /api/products/:id` - Deletar produto (admin)
+# Criar funcionário
+POST /api/employees
 
-### Agendamentos
-- `GET /api/bookings` - Listar agendamentos
-- `POST /api/bookings` - Criar agendamento
-- `PUT /api/bookings/:id/confirm` - Confirmar agendamento
+# Adicionar habilidade ao funcionário
+POST /api/employees/:id/skills
 
-### Disponibilidade
-- `GET /api/availability/slots` - Verificar horários disponíveis
-- `POST /api/availability/check` - Verificar horário específico
+# Ver horários disponíveis
+GET /api/employees/availability/slots?employeeId=123&date=2024-08-31
+```
 
-### Empresas
-- `GET /api/enterprises` - Listar empresas
-- `GET /api/enterprises/:email` - Buscar empresa por email
+### 📅 Agendamentos
+```bash
+# Criar agendamento
+POST /api/bookings
+
+# Buscar funcionários disponíveis
+GET /api/employees/availability/service?enterpriseEmail=empresa@exemplo.com&productId=corte&date=2024-08-31&startTime=14:00
+```
+
+### 🏢 Empresas
+```bash
+# Listar empresas
+GET /api/enterprises
+
+# Criar empresa
+POST /api/enterprises
+```
+
+## 🛠️ Desenvolvimento
+
+### Instalação Local
+```bash
+# Instalar dependências
+npm install
+
+# Configurar ambiente
+cp .env.example .env
+
+# Iniciar em modo desenvolvimento
+npm run dev
+```
+
+### Estrutura do Projeto
+```
+src/
+├── config/          # Configurações (Firebase, etc)
+├── middleware/      # Middlewares (auth, validação)
+├── routes/          # Rotas da API
+├── services/        # Lógica de negócio
+├── types/           # Tipos TypeScript
+└── utils/           # Utilitários
+```
+
+## 🗃️ Banco de Dados
+
+### Firestore Collections:
+- `enterprises` - Dados das empresas
+- `employees` - Funcionários (segmentados por empresa)
+- `bookings` - Agendamentos
+- `schedules` - Horários de funcionamento
+- `products` - Serviços oferecidos
+- `users` - Usuários do sistema
 
 ## 🔧 Configuração
 
 ### Variáveis de Ambiente (.env)
-
 ```env
-# Firebase Configuration
-FIREBASE_API_KEY=your_api_key
-FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-FIREBASE_PROJECT_ID=your_project_id
-FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-FIREBASE_APP_ID=your_app_id
+# Firebase
+FIREBASE_PROJECT_ID=seu-projeto
+FIREBASE_PRIVATE_KEY=sua-chave-privada
+FIREBASE_CLIENT_EMAIL=seu-email-cliente
 
-# Server Configuration
-NODE_ENV=production
-HOST=0.0.0.0
+# Servidor
 PORT=5000
+NODE_ENV=production
+
+# JWT
+JWT_SECRET=seu-secret-jwt
 ```
 
-## 🔒 Segurança
+## 📊 Cache e Performance
 
-- Autenticação via Firebase Auth
-- Controle de acesso por roles (admin/client)
-- Rate limiting configurado
-- CORS configurado
-- Helmet para headers de segurança
+- **Cache de funcionários**: 5 minutos
+- **Cache de disponibilidade**: 2 minutos  
+- **Invalidação automática** em modificações
+- **Consultas otimizadas** com filtros eficientes
+- **Pré-processamento** de períodos ocupados
 
-## 📊 Monitoramento
+## 🎯 Status do Projeto
 
-- Health check endpoint: `/health`
-- Logs estruturados
-- Docker health check configurado
+✅ **Sistema completo implementado:**
+- Gestão de funcionários
+- Sistema de disponibilidade
+- Agendamentos inteligentes
+- Cache otimizado
+- Autenticação robusta
+- Documentação Swagger
+- Deploy automatizado
+
+**🔥 Pronto para produção!**

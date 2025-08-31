@@ -199,21 +199,32 @@ export const productSchema = {
 export const bookingSchema = {
   type: 'object',
   properties: {
-    id: { type: 'string', example: 'booking123' },
-    clientId: { type: 'string', example: 'client123' },
-    productId: { type: 'string', example: 'prod123' },
-    enterpriseId: { type: 'string', example: 'enterprise123' },
-    dateTime: { type: 'string', format: 'date-time', example: '2025-08-28T14:30:00Z' },
+    id: { type: 'string' },
+    enterpriseEmail: { type: 'string', format: 'email' },
+    clientName: { type: 'string' },
+    clientPhone: { type: 'string' },
+    clientEmail: { type: 'string', format: 'email' },
+    productId: { type: 'string' },
+    productName: { type: 'string' },
+    productDuration: { type: 'number', minimum: 1 },
+    productPrice: { type: 'number', minimum: 0 },
+    employeeId: { type: 'string', description: 'ID do funcionário escolhido' },
+    employeeName: { type: 'string', description: 'Nome do funcionário' },
+    date: { type: 'string', format: 'date', description: 'Data do agendamento (YYYY-MM-DD)' },
+    startTime: { type: 'string', pattern: '^\\d{2}:\\d{2}$', description: 'Horário de início (HH:MM)' },
+    endTime: { type: 'string', pattern: '^\\d{2}:\\d{2}$', description: 'Horário de fim (HH:MM)' },
+    finalPrice: { type: 'number', minimum: 0, description: 'Preço final com multiplicador do funcionário' },
+    actualDuration: { type: 'number', minimum: 1, description: 'Duração real baseada no funcionário' },
     status: { 
       type: 'string', 
       enum: ['pending', 'confirmed', 'cancelled', 'completed'],
-      example: 'confirmed'
+      description: 'Status do agendamento'
     },
-    notes: { type: 'string', example: 'Cliente prefere corte degradê' },
-    totalPrice: { type: 'number', minimum: 0, example: 25.50 },
+    notes: { type: 'string', description: 'Observações do agendamento' },
     createdAt: { type: 'string', format: 'date-time' },
     updatedAt: { type: 'string', format: 'date-time' }
-  }
+  },
+  required: ['enterpriseEmail', 'clientName', 'clientPhone', 'productId', 'date', 'startTime']
 };
 
 export const enterpriseSchema = {
@@ -306,4 +317,161 @@ export const enterpriseEmailQuery = {
     }
   },
   required: ['enterpriseEmail']
+};
+
+export const employeeSchema = {
+  type: 'object',
+  properties: {
+    id: { type: 'string' },
+    enterpriseEmail: { 
+      type: 'string', 
+      format: 'email',
+      description: 'Email da empresa'
+    },
+    name: { 
+      type: 'string', 
+      minLength: 2, 
+      maxLength: 100,
+      description: 'Nome completo do funcionário'
+    },
+    email: { 
+      type: 'string', 
+      format: 'email',
+      description: 'Email pessoal do funcionário'
+    },
+    phone: { 
+      type: 'string',
+      description: 'Telefone de contato'
+    },
+    position: { 
+      type: 'string',
+      description: 'Cargo: Barbeiro, Cabeleireira, Manicure, etc'
+    },
+    hireDate: { 
+      type: 'string', 
+      format: 'date',
+      description: 'Data de contratação'
+    },
+    isActive: { 
+      type: 'boolean',
+      description: 'Se o funcionário está ativo'
+    },
+    avatar: { 
+      type: 'string',
+      description: 'URL da foto do funcionário'
+    },
+    skills: {
+      type: 'array',
+      description: 'Serviços que o funcionário sabe realizar',
+      items: {
+        type: 'object',
+        properties: {
+          productId: { 
+            type: 'string',
+            description: 'ID do serviço/produto'
+          },
+          productName: { 
+            type: 'string',
+            description: 'Nome do serviço'
+          },
+          experienceLevel: { 
+            type: 'string', 
+            enum: ['iniciante', 'intermediario', 'avancado', 'especialista'],
+            description: 'Nível de experiência no serviço'
+          },
+          priceMultiplier: { 
+            type: 'number', 
+            minimum: 0.5, 
+            maximum: 3,
+            description: 'Multiplicador de preço (0.5 = 50% do preço base, 2 = 200%)'
+          },
+          estimatedDuration: { 
+            type: 'number', 
+            minimum: 5,
+            description: 'Tempo estimado que o funcionário leva (em minutos)'
+          }
+        },
+        required: ['productId', 'productName', 'experienceLevel']
+      }
+    },
+    workSchedule: {
+      type: 'object',
+      description: 'Horário de trabalho semanal do funcionário',
+      properties: {
+        monday: {
+          type: 'object',
+          properties: {
+            isWorking: { type: 'boolean' },
+            startTime: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
+            endTime: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
+            breakStart: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
+            breakEnd: { type: 'string', pattern: '^\\d{2}:\\d{2}$' }
+          }
+        },
+        tuesday: {
+          type: 'object',
+          properties: {
+            isWorking: { type: 'boolean' },
+            startTime: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
+            endTime: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
+            breakStart: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
+            breakEnd: { type: 'string', pattern: '^\\d{2}:\\d{2}$' }
+          }
+        },
+        wednesday: {
+          type: 'object',
+          properties: {
+            isWorking: { type: 'boolean' },
+            startTime: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
+            endTime: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
+            breakStart: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
+            breakEnd: { type: 'string', pattern: '^\\d{2}:\\d{2}$' }
+          }
+        },
+        thursday: {
+          type: 'object',
+          properties: {
+            isWorking: { type: 'boolean' },
+            startTime: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
+            endTime: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
+            breakStart: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
+            breakEnd: { type: 'string', pattern: '^\\d{2}:\\d{2}$' }
+          }
+        },
+        friday: {
+          type: 'object',
+          properties: {
+            isWorking: { type: 'boolean' },
+            startTime: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
+            endTime: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
+            breakStart: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
+            breakEnd: { type: 'string', pattern: '^\\d{2}:\\d{2}$' }
+          }
+        },
+        saturday: {
+          type: 'object',
+          properties: {
+            isWorking: { type: 'boolean' },
+            startTime: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
+            endTime: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
+            breakStart: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
+            breakEnd: { type: 'string', pattern: '^\\d{2}:\\d{2}$' }
+          }
+        },
+        sunday: {
+          type: 'object',
+          properties: {
+            isWorking: { type: 'boolean' },
+            startTime: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
+            endTime: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
+            breakStart: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
+            breakEnd: { type: 'string', pattern: '^\\d{2}:\\d{2}$' }
+          }
+        }
+      }
+    },
+    createdAt: { type: 'string', format: 'date-time' },
+    updatedAt: { type: 'string', format: 'date-time' }
+  },
+  required: ['enterpriseEmail', 'name', 'email', 'position', 'isActive']
 };

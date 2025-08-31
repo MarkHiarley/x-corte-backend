@@ -350,5 +350,198 @@ export const bookingService = {
                 error: error instanceof Error ? error.message : 'Erro desconhecido'
             };
         }
+    },
+
+    async getBookingsByEmployeeAndDate(employeeId: string, date: string): Promise<{ success: boolean; data?: Booking[]; error?: string }> {
+        try {
+            const bookingsRef = collection(db, 'bookings');
+            let bookingsQuery = query(
+                bookingsRef,
+                where('employeeId', '==', employeeId),
+                where('date', '==', date)
+            );
+
+            const snapshot = await getDocs(bookingsQuery);
+            const bookings = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            })) as Booking[];
+
+            // Filtrar apenas agendamentos não cancelados
+            const activeBookings = bookings.filter(booking => 
+                booking.status !== 'cancelled'
+            );
+
+            return {
+                success: true,
+                data: activeBookings
+            };
+
+        } catch (error) {
+            console.error('Erro ao buscar agendamentos do funcionário:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Erro desconhecido'
+            };
+        }
+    },
+
+    async createBookingWithEmployee(
+        enterpriseEmail: string,
+        bookingData: {
+            clientName: string;
+            clientPhone: string;
+            clientEmail?: string;
+            productId: string;
+            employeeId?: string; // Funcionário específico (opcional)
+            date: string;
+            startTime: string;
+            notes?: string;
+        }
+    ): Promise<{ success: boolean; data?: Booking; error?: string }> {
+        try {
+            // Verificar se empresa existe
+            const enterpriseCheck = await this.checkEnterpriseExists(enterpriseEmail);
+            if (!enterpriseCheck.success) {
+                return enterpriseCheck;
+            }
+
+            // Buscar dados do produto
+            const productResult = await productService.getProductById(enterpriseEmail, bookingData.productId);
+            if (!productResult.success || !productResult.data) {
+                return {
+                    success: false,
+                    error: 'Produto não encontrado'
+                };
+            }
+
+            const product = productResult.data;
+            let actualDuration = product.duration;
+            let employeeName = '';
+
+            // Se funcionário específico foi escolhido
+            if (bookingData.employeeId) {
+                // Importar employeeService dinamicamente para evitar dependência circular
+                const { employeeService } = await import('./employeeService.js');
+                
+                // Verificar se funcionário existe e está ativo
+                const employeeResult = await employeeService.getEmployeeById(bookingData.employeeId);
+                if (!employeeResult.success || !employeeResult.data) {
+                    return {
+                        success: false,
+                        error: 'Funcionário não encontrado'
+                    };
+                }
+
+                const employee = employeeResult.data;
+                if (!employee.isActive) {
+                    return {
+                        success: false,
+                        error: 'Funcionário não está ativo'
+                    };
+                }
+
+                employeeName = employee.name;
+
+                // Verificar se funcionário tem habilidade para este serviço
+                const skill = employee.skills?.find(s => s.productId === bookingData.productId);
+                if (!skill || !skill.canPerform) {
+                    return {
+                        success: false,
+                        error: 'Funcionário não possui habilidade para este serviço'
+                    };
+                }
+
+                // Usar preço do produto (sem multiplicador) e duração personalizada do funcionário
+                actualDuration = skill.estimatedDuration || product.duration;
+
+                // Verificar disponibilidade do funcionário
+                const { employeeAvailabilityService } = await import('./employeeAvailabilityService.js');
+                const availabilityCheck = await employeeAvailabilityService.isEmployeeAvailableAtTime(
+                    bookingData.employeeId,
+                    bookingData.date,
+                    bookingData.startTime,
+                    actualDuration
+                );
+
+                if (!availabilityCheck.success || !availabilityCheck.available) {
+                    return {
+                        success: false,
+                        error: availabilityCheck.reason || 'Funcionário não disponível neste horário'
+                    };
+                }
+            } else {
+                // Se não especificou funcionário, verificar disponibilidade geral
+                const availabilityCheck = await this.isTimeSlotAvailable(
+                    enterpriseEmail,
+                    bookingData.date,
+                    bookingData.startTime,
+                    actualDuration
+                );
+
+                if (!availabilityCheck.available) {
+                    return {
+                        success: false,
+                        error: 'Horário não disponível'
+                    };
+                }
+            }
+
+            // Calcular horário de término
+            const endTime = this.addMinutesToTime(bookingData.startTime, actualDuration);
+
+            // Criar objeto de agendamento base
+            const bookingBase = {
+                enterpriseEmail,
+                clientName: bookingData.clientName,
+                clientPhone: bookingData.clientPhone,
+                productId: bookingData.productId,
+                productName: product.name,
+                productDuration: product.duration,
+                productPrice: product.price,
+                date: bookingData.date,
+                startTime: bookingData.startTime,
+                endTime: endTime,
+                actualDuration: actualDuration,
+                status: 'pending' as const,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            };
+
+            // Adicionar campos opcionais apenas se existirem
+            const booking: any = { ...bookingBase };
+            
+            if (bookingData.clientEmail) {
+                booking.clientEmail = bookingData.clientEmail;
+            }
+            
+            if (bookingData.employeeId) {
+                booking.employeeId = bookingData.employeeId;
+            }
+            
+            if (employeeName) {
+                booking.employeeName = employeeName;
+            }
+            
+            if (bookingData.notes) {
+                booking.notes = bookingData.notes;
+            }
+
+            // Salvar no Firestore na subcoleção da empresa
+            const bookingsCollectionPath = `enterprises/${enterpriseEmail}/bookings`;
+            const bookingRef = await addDoc(collection(db, bookingsCollectionPath), booking);
+
+            return {
+                success: true,
+                data: { id: bookingRef.id, ...booking } as Booking
+            };
+
+        } catch (error) {
+            console.error('Erro ao criar agendamento:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Erro interno'
+            };
+        }
     }
 };
