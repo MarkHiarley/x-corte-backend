@@ -1,6 +1,7 @@
 import { db, isFirebaseConfigured } from "../config/firebase.js";
 import { collection, getDocs, doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
 import { Enterprise } from "../types/index.js";
+import { createSuccessResponse, createErrorResponse, standardMessages, logError, logInfo, ApiResponse } from '../utils/responseHelpers.js';
 
 function convertDate(dateField: any): Date {
     if (!dateField) return new Date();
@@ -11,36 +12,63 @@ function convertDate(dateField: any): Date {
 }
 
 export const enterpriseService = {
-    async getAllEnterprises() {
+    async getAllEnterprises(): Promise<ApiResponse<Enterprise[]>> {
         try {
+            logInfo('getAllEnterprises', 'Buscando todas as empresas');
+
             if (!isFirebaseConfigured()) {
-                return {
-                    success: false,
-                    error: 'Firebase não configurado. Verifique as variáveis de ambiente.'
-                };
+                logError('getAllEnterprises', new Error('Firebase não configurado'));
+                return createErrorResponse(
+                    'Configuração inválida',
+                    'Firebase não configurado. Verifique as variáveis de ambiente.'
+                );
             }
 
             const snapshot = await getDocs(collection(db, 'enterprises'));
+            
+            if (snapshot.empty) {
+                logInfo('getAllEnterprises', 'Nenhuma empresa encontrada');
+                return createSuccessResponse(
+                    'Nenhuma empresa cadastrada ainda',
+                    []
+                );
+            }
+
             const enterprises: Enterprise[] = [];
             
             snapshot.forEach((doc) => {
                 const data = doc.data();
-                enterprises.push({
-                    email: doc.id,
-                    name: data.name || 'Nome não informado',
-                    phone: data.phone || '',
-                    address: data.address || '',
-                    createdAt: convertDate(data.createdAt),
-                    updatedAt: convertDate(data.updatedAt)
-                });
+                if (data) {
+                    enterprises.push({
+                        email: doc.id,
+                        name: data.name || 'Nome não informado',
+                        phone: data.phone || '',
+                        address: data.address || '',
+                        createdAt: convertDate(data.createdAt),
+                        updatedAt: convertDate(data.updatedAt)
+                    });
+                }
             });
 
-            return { success: true, data: enterprises };
-        } catch (error) {
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : 'Erro desconhecido'
-            };
+            if (enterprises.length === 0) {
+                return createSuccessResponse(
+                    'Nenhuma empresa válida encontrada',
+                    []
+                );
+            }
+
+            logInfo('getAllEnterprises', `${enterprises.length} empresas recuperadas`);
+
+            return createSuccessResponse(
+                standardMessages.listed('empresas'),
+                enterprises
+            );
+        } catch (error: any) {
+            logError('getAllEnterprises', error);
+            return createErrorResponse(
+                standardMessages.internalError,
+                error.message
+            );
         }
     },
 

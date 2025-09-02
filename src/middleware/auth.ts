@@ -23,7 +23,8 @@ export async function authenticate(request: AuthenticatedRequest, reply: Fastify
     if (!authorization || !authorization.startsWith('Bearer ')) {
       return reply.status(401).send({
         success: false,
-        message: 'Token de acesso requerido'
+        message: 'Token de acesso requerido',
+        error: 'Header Authorization com Bearer token é obrigatório'
       });
     }
 
@@ -38,7 +39,8 @@ export async function authenticate(request: AuthenticatedRequest, reply: Fastify
     if (!userDoc.exists()) {
       return reply.status(401).send({
         success: false,
-        message: 'Usuário não encontrado'
+        message: 'Usuário não encontrado',
+        error: 'Perfil do usuário não existe no sistema'
       });
     }
 
@@ -51,10 +53,11 @@ export async function authenticate(request: AuthenticatedRequest, reply: Fastify
       enterpriseEmail: userData?.enterpriseEmail
     };
 
-  } catch (error) {
+  } catch (error: any) {
     return reply.status(401).send({
       success: false,
-      message: 'Token inválido'
+      message: 'Token inválido',
+      error: error.message || 'Token de autenticação inválido'
     });
   }
 }

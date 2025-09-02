@@ -21,7 +21,6 @@ interface AddSkillBody {
   productId: string;
   productName: string;
   experienceLevel: 'iniciante' | 'intermediario' | 'avancado' | 'especialista';
-  estimatedDuration?: number;
   canPerform?: boolean;
 }
 
@@ -265,7 +264,7 @@ export async function employeeRoutes(fastify: FastifyInstance) {
                   enum: ['iniciante', 'intermediario', 'avancado', 'especialista']
                 },
                 priceMultiplier: { type: 'number', minimum: 0.5, maximum: 3 },
-                estimatedDuration: { type: 'number', minimum: 5 }
+                // Removido estimatedDuration - usa duração padrão do produto
               },
               required: ['productId', 'productName', 'experienceLevel']
             }
@@ -467,7 +466,7 @@ export async function employeeRoutes(fastify: FastifyInstance) {
     schema: {
       tags: ['Employees'],
       summary: 'Adicionar habilidade',
-      description: 'Adiciona uma nova habilidade/especialidade ao funcionário',
+      description: 'Adiciona uma nova habilidade/especialidade ao funcionário. O funcionário poderá realizar este serviço com o preço e duração definidos pela empresa.',
       security: [{ bearerAuth: [] }],
       params: {
         type: 'object',
@@ -494,11 +493,6 @@ export async function employeeRoutes(fastify: FastifyInstance) {
             type: 'string',
             enum: ['iniciante', 'intermediario', 'avancado', 'especialista'],
             description: 'Nível de experiência do funcionário neste serviço'
-          },
-          estimatedDuration: { 
-            type: 'number',
-            minimum: 5,
-            description: 'Tempo que este funcionário leva para realizar o serviço (em minutos). Se não informado, usa a duração padrão do produto.'
           },
           canPerform: { 
             type: 'boolean',

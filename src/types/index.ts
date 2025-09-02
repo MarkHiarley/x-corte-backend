@@ -99,8 +99,7 @@ export interface EmployeeSkill {
     productId: string;
     productName: string;
     experienceLevel: 'iniciante' | 'intermediario' | 'avancado' | 'especialista';
-    estimatedDuration?: number; // Tempo que esse funcionário leva (em minutos) - opcional
-    canPerform: boolean; // Se o funcionário pode realizar este serviço
+    canPerform: boolean;
 }
 
 export interface EmployeeWorkSchedule {

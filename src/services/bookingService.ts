@@ -452,8 +452,7 @@ export const bookingService = {
                     };
                 }
 
-                // Usar preço do produto (sem multiplicador) e duração personalizada do funcionário
-                actualDuration = skill.estimatedDuration || product.duration;
+                actualDuration = product.duration;
 
                 // Verificar disponibilidade do funcionário
                 const { employeeAvailabilityService } = await import('./employeeAvailabilityService.js');

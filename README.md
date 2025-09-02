@@ -51,11 +51,56 @@ Sistema completo de gestão para barbearias com multi-tenancy, funcionários e a
 - Invalidação automática do cache
 - Respostas mínimas e rápidas
 
+### 🛡️ Tratamento de Erros Avançado
+- Respostas padronizadas em formato único
+- Validação robusta de entrada
+- Logs estruturados para debugging
+- Mensagens de erro localizadas em português
+- Verificação de arrays vazios
+- Tratamento específico para cada tipo de erro
+
 ## 🔐 Autenticação
 
 Todas as rotas são protegidas por JWT. Header necessário:
 ```
 Authorization: Bearer <seu-token-jwt>
+```
+
+## 📡 API Response Format
+
+Todas as respostas seguem o formato padronizado:
+
+```json
+{
+  "success": true|false,
+  "message": "Descrição da operação",
+  "data": "objeto com dados (apenas em sucesso)",
+  "error": "detalhes do erro (apenas em falha)"
+}
+```
+
+### Exemplos de Resposta
+
+**Sucesso:**
+```json
+{
+  "success": true,
+  "message": "Funcionário criado com sucesso",
+  "data": {
+    "id": "func123",
+    "name": "João Silva",
+    "email": "joao@exemplo.com"
+  }
+}
+```
+
+**Erro:**
+```json
+{
+  "success": false,
+  "message": "Funcionário não encontrado",
+  "error": "Funcionário com ID func123 não existe na empresa"
+}
 ```
 
 ## 📡 Principais Endpoints
@@ -113,10 +158,28 @@ src/
 ├── config/          # Configurações (Firebase, etc)
 ├── middleware/      # Middlewares (auth, validação)
 ├── routes/          # Rotas da API
-├── services/        # Lógica de negócio
+├── services/        # Lógica de negócio com tratamento de erro
 ├── types/           # Tipos TypeScript
-└── utils/           # Utilitários
+├── utils/           # Utilitários e helpers de resposta
+└── schemas/         # Schemas para documentação Swagger
 ```
+
+## 🛡️ Sistema de Logs
+
+### Logs Estruturados
+```typescript
+// Informações
+logInfo('operacao', 'Descrição', { context });
+
+// Erros
+logError('operacao', error, { context });
+```
+
+### Benefícios:
+- Debugging eficiente
+- Rastreamento de operações
+- Context específico para cada erro
+- Logs padronizados em português
 
 ## 🗃️ Banco de Dados
 
@@ -157,10 +220,12 @@ JWT_SECRET=seu-secret-jwt
 
 ✅ **Sistema completo implementado:**
 - Gestão de funcionários
-- Sistema de disponibilidade
+- Sistema de disponibilidade  
 - Agendamentos inteligentes
 - Cache otimizado
 - Autenticação robusta
+- Tratamento de erros padronizado
+- Logs estruturados
 - Documentação Swagger
 - Deploy automatizado
 

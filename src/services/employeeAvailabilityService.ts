@@ -219,7 +219,7 @@ class EmployeeAvailabilityService {
         if (!skill || !skill.canPerform) continue;
 
         // Usar duração personalizada do funcionário ou padrão
-        const serviceDuration = duration || skill.estimatedDuration || baseDuration;
+        const serviceDuration = duration || baseDuration;
 
         const availabilityResult = await this.isEmployeeAvailableAtTime(
           employee.id,
@@ -235,7 +235,7 @@ class EmployeeAvailabilityService {
             email: employee.email,
             available: true,
             experienceLevel: skill.experienceLevel,
-            estimatedDuration: skill.estimatedDuration || baseDuration,
+            estimatedDuration: baseDuration,
             customDuration: serviceDuration,
             price: basePrice, // Preço sempre o mesmo do produto
             duration: baseDuration

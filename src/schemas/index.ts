@@ -1,98 +1,103 @@
-// Schemas reutilizáveis para documentação Swagger
+ // Schemas reutilizáveis para documentação Swagger
 
-export const errorResponse = {
+// Schema base para respostas da API
+export const baseApiResponse = {
   type: 'object',
   properties: {
-    success: { type: 'boolean' },
-    message: { type: 'string' },
-    error: { type: 'string' }
-  },
-  required: ['success', 'message']
-};
-
-export const successResponse = {
-  type: 'object',
-  properties: {
-    success: { type: 'boolean' },
-    message: { type: 'string' },
-    data: { type: 'object' }
+    success: { type: 'boolean', description: 'Indica se a operação foi bem-sucedida' },
+    message: { type: 'string', description: 'Mensagem descritiva sobre o resultado' },
+    data: { type: 'object', description: 'Dados retornados (apenas em caso de sucesso)' },
+    error: { type: 'string', description: 'Detalhes do erro (apenas em caso de falha)' }
   },
   required: ['success']
 };
 
-// Status Code Responses específicos
+// Schema para respostas de sucesso
+export const successResponse = {
+  type: 'object',
+  properties: {
+    success: { type: 'boolean', enum: [true] },
+    message: { type: 'string', description: 'Mensagem de sucesso (opcional)' },
+    data: { type: 'object', description: 'Dados retornados' }
+  },
+  required: ['success']
+};
+
+// Schema para respostas de erro
+export const errorResponse = {
+  type: 'object',
+  properties: {
+    success: { type: 'boolean', enum: [false] },
+    message: { type: 'string', description: 'Mensagem de erro' },
+    error: { type: 'string', description: 'Detalhes técnicos do erro' }
+  },
+  required: ['success', 'message', 'error']
+};
+
+// Schema para erros de validação
+export const validationErrorResponse = {
+  type: 'object',
+  properties: {
+    success: { type: 'boolean', enum: [false] },
+    message: { type: 'string', description: 'Mensagem de erro de validação' },
+    error: { type: 'string', description: 'Tipo de erro' },
+    validationErrors: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          field: { type: 'string', description: 'Campo com erro' },
+          message: { type: 'string', description: 'Mensagem específica do erro' }
+        }
+      },
+      description: 'Lista detalhada de erros de validação'
+    }
+  },
+  required: ['success', 'message', 'error']
+};
+
+// Status Code Responses padronizados
 export const responses = {
   // 2xx Success
   200: {
     type: 'object',
     properties: {
-      success: { type: 'boolean' },
-      data: { type: 'object' }
+      success: { type: 'boolean', enum: [true] },
+      message: { type: 'string', description: 'Mensagem de sucesso (opcional)' },
+      data: { type: 'object', description: 'Dados retornados' }
     },
-    description: 'Operação realizada com sucesso'
+    required: ['success'],
+    description: 'Operação realizada com sucesso',
+    example: {
+      success: true,
+      message: 'Operação concluída com sucesso',
+      data: {}
+    }
   },
+  
   201: {
     type: 'object',
     properties: {
-      success: { type: 'boolean' },
-      message: { type: 'string' },
-      data: { type: 'object' }
+      success: { type: 'boolean', enum: [true] },
+      message: { type: 'string', description: 'Mensagem de criação' },
+      data: { type: 'object', description: 'Recurso criado' }
     },
-    description: 'Recurso criado com sucesso'
+    required: ['success', 'message'],
+    description: 'Recurso criado com sucesso',
+    example: {
+      success: true,
+      message: 'Recurso criado com sucesso',
+      data: { id: 'novo_id' }
+    }
   },
   
   // 4xx Client Errors
   400: {
     type: 'object',
     properties: {
-      success: { type: 'boolean' },
-      message: { type: 'string' },
-      error: { type: 'string' }
-    },
-    description: 'Requisição inválida - dados obrigatórios em falta ou formato incorreto'
-  },
-  401: {
-    type: 'object',
-    properties: {
-      success: { type: 'boolean' },
-      message: { type: 'string' },
-      error: { type: 'string' }
-    },
-    description: 'Não autorizado - token de autenticação inválido, expirado ou em falta'
-  },
-  403: {
-    type: 'object',
-    properties: {
-      success: { type: 'boolean' },
-      message: { type: 'string' },
-      error: { type: 'string' }
-    },
-    description: 'Acesso proibido - usuário não tem permissão para esta operação'
-  },
-  404: {
-    type: 'object',
-    properties: {
-      success: { type: 'boolean' },
-      message: { type: 'string' },
-      error: { type: 'string' }
-    },
-    description: 'Recurso não encontrado'
-  },
-  409: {
-    type: 'object',
-    properties: {
-      success: { type: 'boolean' },
-      message: { type: 'string' },
-      error: { type: 'string' }
-    },
-    description: 'Conflito - recurso já existe ou violação de integridade'
-  },
-  422: {
-    type: 'object',
-    properties: {
-      success: { type: 'boolean' },
-      message: { type: 'string' },
-      error: { type: 'string' },
+      success: { type: 'boolean', enum: [false] },
+      message: { type: 'string', description: 'Mensagem de erro' },
+      error: { type: 'string', description: 'Detalhes do erro' },
       validationErrors: {
         type: 'array',
         items: {
@@ -101,49 +106,179 @@ export const responses = {
             field: { type: 'string' },
             message: { type: 'string' }
           }
-        }
+        },
+        description: 'Erros de validação (quando aplicável)'
       }
     },
-    description: 'Entidade não processável - erro de validação dos dados'
+    required: ['success', 'message', 'error'],
+    description: 'Requisição inválida - dados obrigatórios em falta ou formato incorreto',
+    example: {
+      success: false,
+      message: 'Dados inválidos fornecidos',
+      error: 'Erro de validação'
+    }
   },
+  
+  401: {
+    type: 'object',
+    properties: {
+      success: { type: 'boolean', enum: [false] },
+      message: { type: 'string', description: 'Mensagem de erro de autenticação' },
+      error: { type: 'string', description: 'Tipo de erro de autenticação' }
+    },
+    required: ['success', 'message', 'error'],
+    description: 'Não autorizado - token de autenticação inválido, expirado ou em falta',
+    example: {
+      success: false,
+      message: 'Token inválido ou expirado',
+      error: 'Erro de autenticação'
+    }
+  },
+  
+  403: {
+    type: 'object',
+    properties: {
+      success: { type: 'boolean', enum: [false] },
+      message: { type: 'string', description: 'Mensagem de erro de autorização' },
+      error: { type: 'string', description: 'Tipo de erro de autorização' }
+    },
+    required: ['success', 'message', 'error'],
+    description: 'Acesso proibido - usuário não tem permissão para esta operação',
+    example: {
+      success: false,
+      message: 'Acesso negado para esta operação',
+      error: 'Erro de autorização'
+    }
+  },
+  
+  404: {
+    type: 'object',
+    properties: {
+      success: { type: 'boolean', enum: [false] },
+      message: { type: 'string', description: 'Mensagem de recurso não encontrado' },
+      error: { type: 'string', description: 'Tipo de erro' }
+    },
+    required: ['success', 'message', 'error'],
+    description: 'Recurso não encontrado',
+    example: {
+      success: false,
+      message: 'Funcionário não encontrado',
+      error: 'Recurso não encontrado'
+    }
+  },
+  
+  409: {
+    type: 'object',
+    properties: {
+      success: { type: 'boolean', enum: [false] },
+      message: { type: 'string', description: 'Mensagem de conflito' },
+      error: { type: 'string', description: 'Tipo de conflito' }
+    },
+    required: ['success', 'message', 'error'],
+    description: 'Conflito - recurso já existe ou violação de integridade',
+    example: {
+      success: false,
+      message: 'Funcionário com este email já existe',
+      error: 'Conflito de dados'
+    }
+  },
+  
+  422: {
+    type: 'object',
+    properties: {
+      success: { type: 'boolean', enum: [false] },
+      message: { type: 'string', description: 'Mensagem de erro de validação' },
+      error: { type: 'string', description: 'Tipo de erro' },
+      validationErrors: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            field: { type: 'string', description: 'Campo com erro' },
+            message: { type: 'string', description: 'Mensagem de erro específica' }
+          }
+        },
+        description: 'Lista detalhada de erros de validação'
+      }
+    },
+    required: ['success', 'message', 'error'],
+    description: 'Entidade não processável - erro de validação dos dados',
+    example: {
+      success: false,
+      message: 'Erros de validação encontrados',
+      error: 'Erro de validação',
+      validationErrors: [
+        { field: 'email', message: 'Email é obrigatório' },
+        { field: 'name', message: 'Nome deve ter pelo menos 2 caracteres' }
+      ]
+    }
+  },
+  
   429: {
     type: 'object',
     properties: {
-      success: { type: 'boolean' },
-      message: { type: 'string' },
-      error: { type: 'string' },
-      retryAfter: { type: 'number' }
+      success: { type: 'boolean', enum: [false] },
+      message: { type: 'string', description: 'Mensagem de rate limit' },
+      error: { type: 'string', description: 'Tipo de erro' },
+      retryAfter: { type: 'number', description: 'Tempo em segundos para tentar novamente' }
     },
-    description: 'Muitas requisições - limite de rate limit excedido'
+    required: ['success', 'message', 'error'],
+    description: 'Muitas requisições - limite de rate limit excedido',
+    example: {
+      success: false,
+      message: 'Muitas requisições. Tente novamente em 60 segundos',
+      error: 'Rate limit excedido',
+      retryAfter: 60
+    }
   },
   
   // 5xx Server Errors
   500: {
     type: 'object',
     properties: {
-      success: { type: 'boolean' },
-      message: { type: 'string' },
-      error: { type: 'string' }
+      success: { type: 'boolean', enum: [false] },
+      message: { type: 'string', description: 'Mensagem de erro interno' },
+      error: { type: 'string', description: 'Tipo de erro interno' }
     },
-    description: 'Erro interno do servidor'
+    required: ['success', 'message', 'error'],
+    description: 'Erro interno do servidor',
+    example: {
+      success: false,
+      message: 'Erro interno do servidor',
+      error: 'Erro interno'
+    }
   },
+  
   502: {
     type: 'object',
     properties: {
-      success: { type: 'boolean' },
-      message: { type: 'string' },
-      error: { type: 'string' }
+      success: { type: 'boolean', enum: [false] },
+      message: { type: 'string', description: 'Mensagem de erro de gateway' },
+      error: { type: 'string', description: 'Tipo de erro de gateway' }
     },
-    description: 'Bad Gateway - erro na comunicação com serviços externos (Firebase)'
+    required: ['success', 'message', 'error'],
+    description: 'Bad Gateway - erro de comunicação com serviços externos',
+    example: {
+      success: false,
+      message: 'Erro de comunicação com o banco de dados',
+      error: 'Bad Gateway'
+    }
   },
+  
   503: {
     type: 'object',
     properties: {
-      success: { type: 'boolean' },
-      message: { type: 'string' },
-      error: { type: 'string' }
+      success: { type: 'boolean', enum: [false] },
+      message: { type: 'string', description: 'Mensagem de serviço indisponível' },
+      error: { type: 'string', description: 'Tipo de erro de disponibilidade' }
     },
-    description: 'Serviço indisponível - servidor temporariamente sobrecarregado'
+    required: ['success', 'message', 'error'],
+    description: 'Serviço temporariamente indisponível',
+    example: {
+      success: false,
+      message: 'Serviço temporariamente indisponível',
+      error: 'Service Unavailable'
+    }
   }
 };
 
@@ -153,9 +288,9 @@ export const userSchema = {
     uid: { type: 'string', description: 'ID único do usuário no Firebase' },
     email: { type: 'string', format: 'email' },
     name: { type: 'string' },
-    role: { type: 'string', enum: ['admin', 'client'] },
+    role: { type: 'string', enum: ['admin', 'client', 'employee'] },
     phone: { type: 'string' },
-    enterpriseId: { type: 'string', description: 'ID da empresa (apenas para admins)' },
+    enterpriseEmail: { type: 'string', format: 'email', description: 'Email da empresa (para admins e funcionários)' },
     createdAt: { type: 'string', format: 'date-time' },
     updatedAt: { type: 'string', format: 'date-time' }
   }
@@ -379,16 +514,9 @@ export const employeeSchema = {
             enum: ['iniciante', 'intermediario', 'avancado', 'especialista'],
             description: 'Nível de experiência no serviço'
           },
-          priceMultiplier: { 
-            type: 'number', 
-            minimum: 0.5, 
-            maximum: 3,
-            description: 'Multiplicador de preço (0.5 = 50% do preço base, 2 = 200%)'
-          },
-          estimatedDuration: { 
-            type: 'number', 
-            minimum: 5,
-            description: 'Tempo estimado que o funcionário leva (em minutos)'
+          canPerform: { 
+            type: 'boolean',
+            description: 'Se o funcionário pode realizar este serviço'
           }
         },
         required: ['productId', 'productName', 'experienceLevel']

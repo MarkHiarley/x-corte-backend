@@ -1,6 +1,7 @@
 import { db } from '../config/firebase.js';
 import { Employee, EmployeeSkill } from '../types/index.js';
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, getDoc, orderBy } from 'firebase/firestore';
+import { createSuccessResponse, createErrorResponse, standardMessages, logError, logInfo } from '../utils/responseHelpers.js';
 
 // Cache simples para melhorar performance
 const cache = new Map<string, { data: any; timestamp: number }>();
@@ -42,14 +43,18 @@ class EmployeeService {
     }
   }
 
-  async createEmployee(employee: Employee): Promise<{ success: boolean; data?: Employee; error?: string }> {
+  async createEmployee(employee: Employee): Promise<{ success: boolean; data?: Employee; error?: string; message?: string }> {
     try {
+      logInfo('createEmployee', `Tentando criar funcionário: ${employee.email}`, { enterpriseEmail: employee.enterpriseEmail });
+
       // Verificar se já existe funcionário com mesmo email na empresa
       const existingEmployee = await this.getEmployeeByEmail(employee.enterpriseEmail, employee.email);
       if (existingEmployee.success && existingEmployee.data) {
+        logInfo('createEmployee', 'Funcionário já existe', { email: employee.email });
         return {
           success: false,
-          error: 'Já existe um funcionário com este email nesta empresa'
+          message: standardMessages.employeeAlreadyExists,
+          error: `Funcionário com email ${employee.email} já existe na empresa`
         };
       }
 
@@ -62,27 +67,50 @@ class EmployeeService {
       };
 
       const docRef = await addDoc(collection(db, this.collectionName), employeeData);
+      const newEmployee = { ...employeeData, id: docRef.id };
+      
+      // Invalidar cache após criação
+      this.invalidateEmployeeCache(employee.enterpriseEmail);
+      
+      logInfo('createEmployee', 'Funcionário criado com sucesso', { id: docRef.id });
       
       return {
         success: true,
-        data: { ...employeeData, id: docRef.id }
+        message: standardMessages.employeeCreated,
+        data: newEmployee
       };
     } catch (error: any) {
-      console.error('Erro ao criar funcionário:', error);
+      logError('createEmployee', error, { email: employee.email, enterpriseEmail: employee.enterpriseEmail });
       return {
         success: false,
+        message: standardMessages.internalError,
         error: error.message
       };
     }
   }
 
-  async getAllEmployees(enterpriseEmail: string): Promise<{ success: boolean; data?: Employee[]; error?: string }> {
+  async getAllEmployees(enterpriseEmail: string): Promise<{ success: boolean; data?: Employee[]; error?: string; message?: string }> {
     try {
+      logInfo('getAllEmployees', `Buscando funcionários para empresa: ${enterpriseEmail}`);
+
+      if (!enterpriseEmail || enterpriseEmail.trim() === '') {
+        return {
+          success: false,
+          message: 'Email da empresa é obrigatório',
+          error: 'Email da empresa não fornecido'
+        };
+      }
+
       // Verificar cache primeiro
       const cacheKey = `employees:${enterpriseEmail}`;
       const cached = this.getFromCache(cacheKey);
       if (cached) {
-        return { success: true, data: cached };
+        logInfo('getAllEmployees', 'Dados recuperados do cache', { enterpriseEmail });
+        return { 
+          success: true, 
+          message: standardMessages.employeesListed,
+          data: cached 
+        };
       }
 
       const q = query(
@@ -92,55 +120,135 @@ class EmployeeService {
       );
       
       const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        logInfo('getAllEmployees', 'Nenhum funcionário encontrado', { enterpriseEmail });
+        return {
+          success: true,
+          message: 'Nenhum funcionário cadastrado ainda',
+          data: []
+        };
+      }
+
       const employees: Employee[] = [];
       
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        // Retornar apenas campos essenciais para listagem (otimização)
-        employees.push({ 
-          id: doc.id, 
-          name: data.name,
-          email: data.email,
-          phone: data.phone,
-          position: data.position,
-          isActive: data.isActive,
-          enterpriseEmail: data.enterpriseEmail,
-          avatar: data.avatar,
-          // Incluir skills para filtros, mas sem dados desnecessários
-          skills: data.skills?.map((skill: any) => ({
-            productId: skill.productId,
-            productName: skill.productName,
-            canPerform: skill.canPerform,
-            experienceLevel: skill.experienceLevel
-          })) || []
-        } as Employee);
+        if (data) {
+          // Retornar apenas campos essenciais para listagem (otimização)
+          employees.push({ 
+            id: doc.id, 
+            name: data.name || '',
+            email: data.email || '',
+            phone: data.phone || '',
+            position: data.position || '',
+            isActive: data.isActive !== false,
+            enterpriseEmail: data.enterpriseEmail,
+            avatar: data.avatar || '',
+            // Incluir skills para filtros, mas sem dados desnecessários
+            skills: data.skills?.map((skill: any) => ({
+              productId: skill.productId,
+              productName: skill.productName,
+              canPerform: skill.canPerform,
+              experienceLevel: skill.experienceLevel
+            })) || [],
+            hireDate: data.hireDate?.toDate() || new Date(),
+            createdAt: data.createdAt?.toDate() || new Date(),
+            updatedAt: data.updatedAt?.toDate() || new Date()
+          } as Employee);
+        }
       });
+
+      if (employees.length === 0) {
+        return {
+          success: true,
+          message: 'Nenhum funcionário válido encontrado',
+          data: []
+        };
+      }
 
       // Salvar no cache
       this.setCache(cacheKey, employees);
 
+      logInfo('getAllEmployees', `${employees.length} funcionários recuperados`, { enterpriseEmail });
+
       return {
         success: true,
+        message: standardMessages.employeesListed,
         data: employees
       };
     } catch (error: any) {
-      console.error('Erro ao buscar funcionários:', error);
+      logError('getAllEmployees', error, { enterpriseEmail });
       return {
         success: false,
+        message: standardMessages.internalError,
         error: error.message
       };
     }
   }
 
-  async getEmployeeById(id: string): Promise<{ success: boolean; data?: Employee; error?: string }> {
+  async getEmployeeById(id: string): Promise<{ success: boolean; data?: Employee; error?: string; message?: string }> {
     try {
+      logInfo('getEmployeeById', `Buscando funcionário por ID: ${id}`);
+
+      if (!id || id.trim() === '') {
+        return {
+          success: false,
+          message: 'ID do funcionário é obrigatório',
+          error: 'ID do funcionário não fornecido'
+        };
+      }
+
+      // Verificar cache primeiro
+      const cacheKey = `employee:${id}`;
+      const cached = this.getFromCache(cacheKey);
+      if (cached) {
+        logInfo('getEmployeeById', 'Funcionário recuperado do cache', { id });
+        return { 
+          success: true,
+          message: standardMessages.retrieved('Funcionário'),
+          data: cached 
+        };
+      }
+
       const docRef = doc(db, this.collectionName, id);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (!data) {
+          return {
+            success: false,
+            message: 'Dados do funcionário corrompidos',
+            error: 'Funcionário existe mas dados não puderam ser recuperados'
+          };
+        }
+
+        const employee = { 
+          id: docSnap.id, 
+          name: data.name || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          position: data.position || '',
+          isActive: data.isActive !== false,
+          enterpriseEmail: data.enterpriseEmail || '',
+          avatar: data.avatar || '',
+          skills: data.skills || [],
+          workSchedule: data.workSchedule || {},
+          hireDate: data.hireDate?.toDate() || new Date(),
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date()
+        } as Employee;
+
+        // Salvar no cache
+        this.setCache(cacheKey, employee);
+
+        logInfo('getEmployeeById', 'Funcionário recuperado com sucesso', { id });
+
         return {
           success: true,
-          data: { id: docSnap.id, ...docSnap.data() } as Employee
+          message: standardMessages.retrieved('Funcionário'),
+          data: employee
         };
       } else {
         return {
@@ -400,7 +508,7 @@ class EmployeeService {
       return {
         success: true,
         price: finalPrice,
-        duration: skill.estimatedDuration
+        duration: undefined
       };
     } catch (error: any) {
       console.error('Erro ao calcular preço do serviço:', error);

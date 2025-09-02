@@ -4,19 +4,26 @@ import { authenticate, requireAdmin } from '../middleware/auth.js';
 import { productSchema, responses } from '../schemas/index.js';
 
 export async function productRoutes(fastify: FastifyInstance) {
-  fastify.get('/products', {
+  // Rota pública para visualizar produtos da empresa (sem autenticação)
+  fastify.get('/products/:enterpriseEmail', {
     schema: {
       tags: ['Products'],
-      summary: 'Listar produtos/serviços',
-      description: 'Retorna todos os produtos/serviços ativos de uma empresa específica. Usado pelo frontend para exibir catálogo de serviços.',
+      summary: 'Listar produtos/serviços (público)',
+      description: 'Retorna todos os produtos/serviços ativos de uma empresa específica. Rota pública, não requer autenticação.',
+      params: {
+        type: 'object',
+        properties: {
+          enterpriseEmail: {
+            type: 'string',
+            format: 'email',
+            description: 'Email da empresa para listar produtos'
+          }
+        },
+        required: ['enterpriseEmail']
+      },
       querystring: {
         type: 'object',
         properties: {
-          enterpriseEmail: { 
-            type: 'string',
-            format: 'email',
-            description: 'Email da empresa para buscar produtos'
-          },
           category: {
             type: 'string',
             description: 'Filtrar por categoria (opcional)'
@@ -25,8 +32,7 @@ export async function productRoutes(fastify: FastifyInstance) {
             type: 'boolean',
             description: 'Filtrar produtos ativos/inativos (opcional)'
           }
-        },
-        required: ['enterpriseEmail']
+        }
       },
       response: {
         200: {
@@ -40,6 +46,7 @@ export async function productRoutes(fastify: FastifyInstance) {
           }
         },
         400: responses[400],
+        403: responses[403],
         422: responses[422],
         500: responses[500],
         502: responses[502]
@@ -47,34 +54,31 @@ export async function productRoutes(fastify: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const { enterpriseEmail } = request.query as { enterpriseEmail: string };
+      const { enterpriseEmail } = request.params as { enterpriseEmail: string };
       
-      if (!enterpriseEmail) {
+      // Validar formato do email da empresa
+      if (!enterpriseEmail || !enterpriseEmail.includes('@')) {
         return reply.status(400).send({
           success: false,
-          message: 'enterpriseEmail é obrigatório'
+          message: 'Email da empresa inválido',
+          error: 'Parâmetro enterpriseEmail deve ser um email válido'
         });
       }
-      
-      const result = await productService.getProducts(enterpriseEmail);
+
+      // Buscar produtos ativos da empresa (rota pública)
+      const result = await productService.getActiveProducts(enterpriseEmail);
       
       if (result.success) {
-        return {
-          success: true,
-          data: result.data || []
-        };
+        return reply.send(result);
       } else {
-        return reply.status(500).send({
-          success: false,
-          message: result.error || 'Erro desconhecido'
-        });
+        return reply.status(400).send(result);
       }
     } catch (error: any) {
-      fastify.log.error('Erro na API de produtos:', error);
-      
+      console.error('Erro ao buscar produtos:', error);
       return reply.status(500).send({
         success: false,
-        message: error.message || 'Erro interno do servidor'
+        message: 'Erro interno do servidor',
+        error: error.message
       });
     }
   });
@@ -85,15 +89,9 @@ export async function productRoutes(fastify: FastifyInstance) {
       tags: ['Products'],
       summary: 'Criar produto/serviço',
       description: 'Cria um novo produto/serviço na empresa. Apenas administradores podem criar produtos.',
-      security: [{ bearerAuth: [] }],
-      body: {
+      security: [{ bearerAuth: [] }],        body: {
           type: 'object',
           properties: {
-            enterpriseEmail: { 
-              type: 'string',
-              format: 'email',
-              description: 'Email da empresa'
-            },
             name: { 
               type: 'string',
               description: 'Nome do produto/serviço'
@@ -121,7 +119,7 @@ export async function productRoutes(fastify: FastifyInstance) {
               description: 'Se o produto está ativo'
             }
           },
-          required: ['enterpriseEmail', 'name', 'price', 'duration']
+          required: ['name', 'price', 'duration']
         },
       response: {
         201: {
@@ -142,18 +140,29 @@ export async function productRoutes(fastify: FastifyInstance) {
   }, async (request, reply) => {
     try {
       const body = request.body as any;
+      const user = (request as any).user;
 
-      if (!body.enterpriseEmail || !body.name || !body.price || !body.duration) {
+      // Validação de segurança: usuário deve estar associado a uma empresa
+      if (!user?.enterpriseEmail) {
+        return reply.status(403).send({
+          success: false,
+          message: 'Usuário não está associado a nenhuma empresa',
+          error: 'Acesso negado'
+        });
+      }
+
+      // Validações dos dados obrigatórios
+      if (!body.name || !body.price || !body.duration) {
         return reply.status(400).send({
           success: false,
-          message: 'Dados obrigatórios: enterpriseEmail, name, price, duration'
+          message: 'Dados obrigatórios: name, price, duration'
         });
       }
 
       if (typeof body.price !== 'number' || body.price <= 0) {
         return reply.status(400).send({
           success: false,
-          message: 'Preço deve ser um número maior que zero (em centavos)'
+          message: 'Preço deve ser um número maior que zero'
         });
       }
 
@@ -164,8 +173,9 @@ export async function productRoutes(fastify: FastifyInstance) {
         });
       }
 
+      // Usar o enterpriseEmail do token JWT - mais seguro!
       const result = await productService.createProduct(
-        body.enterpriseEmail,
+        user.enterpriseEmail, // Sempre usa o email da empresa do usuário autenticado
         {
           name: body.name,
           price: body.price,
@@ -177,16 +187,9 @@ export async function productRoutes(fastify: FastifyInstance) {
       );
 
       if (result.success) {
-        return {
-          success: true,
-          data: result.data,
-          message: 'Produto criado com sucesso!'
-        };
+        return reply.status(201).send(result);
       } else {
-        return reply.status(500).send({
-          success: false,
-          message: result.error || 'Erro desconhecido'
-        });
+        return reply.status(400).send(result);
       }
 
     } catch (error: any) {
@@ -360,6 +363,76 @@ export async function productRoutes(fastify: FastifyInstance) {
       return reply.status(500).send({
         success: false,
         message: error.message || 'Erro interno do servidor'
+      });
+    }
+  });
+
+  // Rota administrativa para gerenciar produtos (incluindo inativos)
+  fastify.get('/admin/products', {
+    preHandler: [authenticate, requireAdmin],
+    schema: {
+      tags: ['Products'],
+      summary: 'Listar produtos/serviços (admin)',
+      description: 'Retorna todos os produtos/serviços da empresa (incluindo inativos). Apenas administradores podem acessar.',
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          category: {
+            type: 'string',
+            description: 'Filtrar por categoria (opcional)'
+          },
+          active: {
+            type: 'boolean',
+            description: 'Filtrar produtos ativos/inativos (opcional)'
+          }
+        }
+      },
+      response: {
+        200: {
+          ...responses[200],
+          properties: {
+            ...responses[200].properties,
+            data: {
+              type: 'array',
+              items: productSchema
+            }
+          }
+        },
+        400: responses[400],
+        403: responses[403],
+        422: responses[422],
+        500: responses[500],
+        502: responses[502]
+      }
+    }
+  }, async (request, reply) => {
+    try {
+      const user = (request as any).user;
+      
+      // Validação de segurança: usuário deve estar associado a uma empresa
+      if (!user?.enterpriseEmail) {
+        return reply.status(403).send({
+          success: false,
+          message: 'Usuário não está associado a nenhuma empresa',
+          error: 'Acesso negado'
+        });
+      }
+
+      // Usar o enterpriseEmail do token JWT - mais seguro!
+      const result = await productService.getProducts(user.enterpriseEmail);
+      
+      if (result.success) {
+        return reply.send(result);
+      } else {
+        return reply.status(400).send(result);
+      }
+    } catch (error: any) {
+      console.error('Erro ao buscar produtos (admin):', error);
+      return reply.status(500).send({
+        success: false,
+        message: 'Erro interno do servidor',
+        error: error.message
       });
     }
   });

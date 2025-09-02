@@ -23,6 +23,54 @@ const server = Fastify({
   }
 });
 
+// Error handler personalizado para garantir respostas padronizadas
+server.setErrorHandler((error, request, reply) => {
+  // Log do erro para debug
+  server.log.error({ 
+    error: error.message, 
+    stack: error.stack,
+    url: request.url,
+    method: request.method 
+  }, 'Error handler acionado');
+
+  // Determinar status code baseado no tipo de erro
+  let statusCode = 500;
+  let message = 'Erro interno do servidor';
+  let errorType = 'Erro interno';
+
+  if (error.statusCode) {
+    statusCode = error.statusCode;
+  }
+
+  // Tratar diferentes tipos de erro
+  if (error.code === 'FST_ERR_VALIDATION') {
+    statusCode = 400;
+    message = 'Dados de entrada inválidos';
+    errorType = 'Erro de validação';
+    
+    // Extrair detalhes da validação
+    if (error.validation && error.validation.length > 0) {
+      const validationDetails = error.validation.map(v => `${v.instancePath || v.params?.missingProperty || 'campo'}: ${v.message}`).join(', ');
+      message = `Erro de validação: ${validationDetails}`;
+    }
+  } else if (error.code === 'FST_ERR_NOT_FOUND') {
+    statusCode = 404;
+    message = 'Rota não encontrada';
+    errorType = 'Rota não encontrada';
+  } else if (error.message) {
+    message = error.message;
+  }
+
+  // Resposta padronizada
+  const response = {
+    success: false,
+    message,
+    error: errorType
+  };
+
+  reply.status(statusCode).send(response);
+});
+
 async function setupPlugins() {
   await server.register(cors, {
     origin: process.env.NODE_ENV === 'production' 

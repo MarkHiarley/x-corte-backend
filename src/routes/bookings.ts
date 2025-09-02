@@ -83,7 +83,16 @@ export async function bookingRoutes(fastify: FastifyInstance) {
   fastify.post('/bookings', {
     schema: {
       tags: ['Bookings'],
-      description: 'Criar um novo agendamento com opção de escolher funcionário específico',
+      summary: 'Criar agendamento',
+      description: `
+        Cria um novo agendamento com opção de escolher funcionário específico.
+        
+        **Funcionamento:**
+        - Se employeeId for informado, valida se o funcionário pode realizar o serviço
+        - Se não informado, agenda sem funcionário específico
+        - Preço e duração são sempre os definidos pela empresa no produto
+        - Sistema verifica automaticamente disponibilidade de horários
+      `,
       body: {
         type: 'object',
         properties: {
@@ -111,7 +120,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
           },
           employeeId: { 
             type: 'string',
-            description: 'ID do funcionário específico (opcional). Se não informado, será agendado sem funcionário específico.'
+            description: 'ID do funcionário específico (opcional). Se informado, sistema valida se o funcionário pode realizar o serviço.'
           },
           date: { 
             type: 'string',
@@ -290,7 +299,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
                   email: { type: 'string' },
                   available: { type: 'boolean' },
                   experienceLevel: { type: 'string' },
-                  estimatedDuration: { type: 'number' },
+                  // Removido estimatedDuration - usa duração padrão do produto
                   customDuration: { type: 'number' },
                   price: { type: 'number' },
                   duration: { type: 'number' }

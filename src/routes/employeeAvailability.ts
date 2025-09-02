@@ -311,7 +311,7 @@ export async function employeeAvailabilityRoutes(fastify: FastifyInstance) {
                       position: { type: 'string' },
                       experienceLevel: { type: 'string' },
                       estimatedPrice: { type: 'number' },
-                      estimatedDuration: { type: 'number' },
+                      // Removido estimatedDuration - usa duração padrão do produto
                       avatar: { type: 'string' }
                     }
                   }
@@ -353,7 +353,7 @@ export async function employeeAvailabilityRoutes(fastify: FastifyInstance) {
             estimatedPrice: skill?.priceMultiplier ? 
               Math.round((skill.priceMultiplier * 50) * 100) / 100 : // Assumindo preço base de 50
               50,
-            estimatedDuration: skill?.estimatedDuration || duration || 30,
+            estimatedDuration: duration || 30,
             avatar: employee.avatar
           };
         });
@@ -433,7 +433,7 @@ export async function employeeAvailabilityRoutes(fastify: FastifyInstance) {
                 date: { type: 'string' },
                 price: { type: 'number' },
                 duration: { type: 'number' },
-                estimatedDuration: { type: 'number' },
+                // Removido estimatedDuration - usa duração padrão do produto
                 availableSlots: {
                   type: 'array',
                   items: { type: 'string' }
@@ -484,7 +484,7 @@ export async function employeeAvailabilityRoutes(fastify: FastifyInstance) {
 
       // Calcular valores (sem multiplicador de preço)
       const price = basePrice; // Preço sempre igual ao do produto
-      const customDuration = skill.estimatedDuration || baseDuration;
+      const customDuration = baseDuration;
 
       // Buscar horários disponíveis
       const slotsResult = await employeeAvailabilityService.generateTimeSlots(
@@ -503,7 +503,7 @@ export async function employeeAvailabilityRoutes(fastify: FastifyInstance) {
             date,
             price: price,
             duration: baseDuration,
-            estimatedDuration: skill.estimatedDuration || baseDuration,
+            estimatedDuration: baseDuration,
             experienceLevel: skill.experienceLevel,
             availableSlots: slotsResult.data || []
           }
