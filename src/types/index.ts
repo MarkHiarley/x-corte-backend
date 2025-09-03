@@ -78,10 +78,8 @@ export interface Employee {
     id?: string;
     enterpriseEmail: string;
     name: string;
-    email: string;
     phone?: string;
     position: string; // Cargo: "Barbeiro", "Cabeleireira", "Manicure", etc
-    hireDate?: string; // Data de contratação
     isActive: boolean;
     avatar?: string; // URL da foto
     

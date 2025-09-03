@@ -2,13 +2,11 @@ import { employeeService } from './employeeService.js';
 import { bookingService } from './bookingService.js';
 import { Employee, DaySchedule } from '../types/index.js';
 
-// Cache para otimizar consultas repetitivas
 const availabilityCache = new Map<string, { data: any; timestamp: number }>();
-const CACHE_TTL = 2 * 60 * 1000; // 2 minutos (menor que employee service)
+const CACHE_TTL = 2 * 60 * 1000;
 
 class EmployeeAvailabilityService {
   
-  // Método para verificar cache
   private getFromCache(key: string): any {
     const cached = availabilityCache.get(key);
     if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
@@ -18,12 +16,10 @@ class EmployeeAvailabilityService {
     return null;
   }
 
-  // Método para salvar no cache
-  private setCache(key: string, data: any): void {
+  private saveToCache(key: string, data: any): void {
     availabilityCache.set(key, { data, timestamp: Date.now() });
   }
   
-  // Verificar se funcionário está trabalhando em um dia específico
   isEmployeeWorkingOnDay(employee: Employee, dayOfWeek: string): DaySchedule | null {
     const schedule = employee.workSchedule;
     if (!schedule) return null;
@@ -32,11 +28,10 @@ class EmployeeAvailabilityService {
     return daySchedule?.isWorking ? daySchedule : null;
   }
 
-  // Gerar slots de tempo disponíveis para um funcionário em uma data específica
   async generateTimeSlots(
     employeeId: string, 
-    date: string, // YYYY-MM-DD
-    serviceDuration: number = 30 // em minutos
+    date: string,
+    serviceDuration: number = 30
   ): Promise<{ success: boolean; data?: string[]; error?: string }> {
     try {
       // Verificar cache primeiro
@@ -74,7 +69,7 @@ class EmployeeAvailabilityService {
       const daySchedule = this.isEmployeeWorkingOnDay(employee, dayOfWeek);
       if (!daySchedule || !daySchedule.startTime || !daySchedule.endTime) {
         const emptySlots: string[] = [];
-        this.setCache(cacheKey, emptySlots);
+        this.saveToCache(cacheKey, emptySlots);
         return {
           success: true,
           data: emptySlots // Funcionário não trabalha neste dia
@@ -93,7 +88,7 @@ class EmployeeAvailabilityService {
       );
 
       // Salvar no cache
-      this.setCache(cacheKey, timeSlots);
+      this.saveToCache(cacheKey, timeSlots);
 
       return {
         success: true,
@@ -232,7 +227,7 @@ class EmployeeAvailabilityService {
           availableEmployees.push({
             id: employee.id,
             name: employee.name,
-            email: employee.email,
+            position: employee.position,
             available: true,
             experienceLevel: skill.experienceLevel,
             estimatedDuration: baseDuration,

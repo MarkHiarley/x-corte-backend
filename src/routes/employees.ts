@@ -2,12 +2,11 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { employeeService } from '../services/employeeService.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 import { Employee, EmployeeSkill } from '../types/index.js';
-import { employeeSchema, responses } from '../schemas/index.js';
+import { employeeSchema, responses, createEmployeeSchema } from '../schemas/index.js';
 
 interface CreateEmployeeBody {
   enterpriseEmail: string;
   name: string;
-  email: string;
   phone?: string;
   position: string;
   hireDate?: string;
@@ -28,11 +27,10 @@ interface GetEmployeesQuery {
   enterpriseEmail: string;
   position?: string;
   isActive?: boolean;
-  productId?: string; // Para buscar funcionários que sabem fazer um serviço específico
+  productId?: string;
 }
 
 export async function employeeRoutes(fastify: FastifyInstance) {
-  // Listar funcionários
   fastify.get<{
     Querystring: GetEmployeesQuery;
   }>('/employees', {
@@ -109,17 +107,14 @@ export async function employeeRoutes(fastify: FastifyInstance) {
       let result;
       
       if (productId) {
-        // Buscar funcionários que sabem fazer um serviço específico
         result = await employeeService.getEmployeesBySkill(enterpriseEmail, productId);
       } else {
-        // Buscar todos os funcionários da empresa
         result = await employeeService.getAllEmployees(enterpriseEmail);
       }
       
       if (result.success) {
         let employees = result.data || [];
         
-        // Aplicar filtros opcionais
         if (position) {
           employees = employees.filter(emp => emp.position.toLowerCase().includes(position.toLowerCase()));
         }
@@ -147,7 +142,6 @@ export async function employeeRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Obter funcionário por ID
   fastify.get<{
     Params: { id: string };
   }>('/employees/:id', {
@@ -205,7 +199,6 @@ export async function employeeRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Criar funcionário (apenas admins)
   fastify.post<{
     Body: CreateEmployeeBody;
   }>('/employees', {
@@ -213,7 +206,17 @@ export async function employeeRoutes(fastify: FastifyInstance) {
     schema: {
       tags: ['Employees'],
       summary: 'Criar funcionário',
-      description: 'Cria um novo funcionário na empresa. Apenas administradores podem criar funcionários.',
+      description: `
+        Cria um novo funcionário na empresa como um recurso interno.
+        
+        **👨‍💼 Apenas admins:** Requer token de administrador válido
+        **🔒 Segurança:** Admin só pode criar funcionários na própria empresa
+        **⚡ Novo fluxo:** Funcionário não faz login - é recurso interno gerenciado pelo admin
+        **🎯 Próximo passo:** Use /employees/{id}/skills para atribuir serviços
+        
+        **📝 Campos obrigatórios:** name, position
+        **📧 Sem email:** Funcionários não têm mais email/senha
+      `,
       security: [{ bearerAuth: [] }],
       body: {
         type: 'object',
@@ -264,7 +267,6 @@ export async function employeeRoutes(fastify: FastifyInstance) {
                   enum: ['iniciante', 'intermediario', 'avancado', 'especialista']
                 },
                 priceMultiplier: { type: 'number', minimum: 0.5, maximum: 3 },
-                // Removido estimatedDuration - usa duração padrão do produto
               },
               required: ['productId', 'productName', 'experienceLevel']
             }
@@ -323,7 +325,6 @@ export async function employeeRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Atualizar funcionário (apenas admins)
   fastify.put<{
     Params: { id: string };
     Body: UpdateEmployeeBody;
@@ -402,7 +403,6 @@ export async function employeeRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Deletar funcionário (apenas admins)
   fastify.delete<{
     Params: { id: string };
   }>('/employees/:id', {
@@ -457,7 +457,6 @@ export async function employeeRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Adicionar habilidade ao funcionário
   fastify.post<{
     Params: { id: string };
     Body: AddSkillBody;
@@ -525,10 +524,9 @@ export async function employeeRoutes(fastify: FastifyInstance) {
       const { id } = request.params;
       const skill = request.body;
 
-      // Garantir que canPerform seja true por padrão
       const skillWithPerform = {
         ...skill,
-        canPerform: skill.canPerform !== false // true por padrão
+        canPerform: skill.canPerform !== false
       };
 
       const result = await employeeService.addSkillToEmployee(id, skillWithPerform);
@@ -556,7 +554,6 @@ export async function employeeRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Remover habilidade do funcionário
   fastify.delete<{
     Params: { id: string; productId: string };
   }>('/employees/:id/skills/:productId', {

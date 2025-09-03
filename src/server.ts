@@ -23,9 +23,7 @@ const server = Fastify({
   }
 });
 
-// Error handler personalizado para garantir respostas padronizadas
 server.setErrorHandler((error, request, reply) => {
-  // Log do erro para debug
   server.log.error({ 
     error: error.message, 
     stack: error.stack,

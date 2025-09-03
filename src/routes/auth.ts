@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { authService } from '../services/authService.js';
 import { enterpriseService } from '../services/enterpriseService.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
-import { userSchema, responses, enterpriseSchema } from '../schemas/index.js';
+import { userSchema, responses, enterpriseSchema, enterpriseRegistrationSchema } from '../schemas/index.js';
 
 export async function authRoutes(fastify: FastifyInstance) {
   fastify.post('/auth/register', {
@@ -15,9 +15,10 @@ export async function authRoutes(fastify: FastifyInstance) {
         **Tipos de usuário:**
         - **client**: Cliente comum que agenda serviços
         - **admin**: Administrador de empresa (requer enterpriseEmail)
-        - **employee**: Funcionário de empresa (requer enterpriseEmail)
         
-        **⚠️ Importante:** Use /auth/register-enterprise para criar empresas novas.
+        **⚠️ Importante:** 
+        - Use /auth/register-enterprise para criar empresas novas
+        - Funcionários não fazem login - são recursos internos gerenciados pelo admin
       `,
       body: {
         type: 'object',
@@ -39,13 +40,13 @@ export async function authRoutes(fastify: FastifyInstance) {
           },
           role: { 
             type: 'string', 
-            enum: ['admin', 'client', 'employee'],
+            enum: ['admin', 'client'],
             description: 'Tipo de usuário'
           },
           enterpriseEmail: { 
             type: 'string', 
             format: 'email',
-            description: 'Email da empresa (obrigatório para admins e funcionários)'
+            description: 'Email da empresa (obrigatório para admins)'
           },
           phone: { 
             type: 'string',
@@ -73,10 +74,10 @@ export async function authRoutes(fastify: FastifyInstance) {
     try {
       const { email, password, name, role, enterpriseEmail, phone } = request.body as any;
       
-      if ((role === 'admin' || role === 'employee') && !enterpriseEmail) {
+      if (role === 'admin' && !enterpriseEmail) {
         return reply.status(400).send({
           success: false,
-          message: 'enterpriseEmail é obrigatório para administradores e funcionários'
+          message: 'enterpriseEmail é obrigatório para administradores'
         });
       }
 
@@ -275,7 +276,6 @@ export async function authRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Nova rota: Registro simplificado com email único da empresa
   fastify.post('/auth/register-enterprise', {
     schema: {
       tags: ['Authentication'],
@@ -293,40 +293,7 @@ export async function authRoutes(fastify: FastifyInstance) {
         
         **⭐ Recomendado:** Use esta rota para novos negócios.
       `,
-      body: {
-        type: 'object',
-        properties: {
-          email: { 
-            type: 'string', 
-            format: 'email',
-            description: 'Email comercial da empresa (será usado para login do admin)'
-          },
-          password: { 
-            type: 'string', 
-            minLength: 6,
-            description: 'Senha para login do administrador'
-          },
-          name: { 
-            type: 'string', 
-            minLength: 2,
-            description: 'Nome completo do proprietário/administrador'
-          },
-          enterpriseName: { 
-            type: 'string',
-            minLength: 2,
-            description: 'Nome comercial da empresa/barbearia'
-          },
-          phone: { 
-            type: 'string',
-            description: 'Telefone da empresa (opcional)'
-          },
-          address: { 
-            type: 'string',
-            description: 'Endereço completo da empresa (opcional)'
-          }
-        },
-        required: ['email', 'password', 'name', 'enterpriseName']
-      },
+      body: enterpriseRegistrationSchema,
       response: {
         201: {
           ...responses[201],
@@ -352,15 +319,14 @@ export async function authRoutes(fastify: FastifyInstance) {
   }, async (request, reply) => {
     try {
       const { 
-        email,          // Email da empresa (único)
+        email,
         password, 
-        name,           // Nome do proprietário
-        enterpriseName, // Nome comercial
+        name,
+        enterpriseName,
         phone, 
         address 
       } = request.body as any;
 
-      // 1. Verificar se empresa/usuário já existe
       const userExists = await authService.login(email, 'fake_password_test');
       if (userExists.success) {
         return reply.status(409).send({
@@ -370,10 +336,9 @@ export async function authRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // 2. Criar a empresa
       const enterpriseResult = await enterpriseService.createEnterprise({
-        email: email,           // Email da empresa
-        name: enterpriseName,   // Nome comercial
+        email: email,
+        name: enterpriseName,
         phone: phone,
         address: address
       });
@@ -386,13 +351,12 @@ export async function authRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // 3. Criar o usuário/admin (email da empresa = email de login)
       const adminResult = await authService.registerUser(
-        email,          // Email da empresa para login
+        email,
         password, 
-        name,           // Nome do proprietário
+        name,
         'admin',
-        email,          // enterpriseEmail = mesmo email
+        email,
         phone
       );
 
@@ -404,7 +368,6 @@ export async function authRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // 4. Fazer login automático e retornar token
       const loginResult = await authService.login(email, password);
       
       return reply.status(201).send({
@@ -419,134 +382,6 @@ export async function authRoutes(fastify: FastifyInstance) {
 
     } catch (error: any) {
       fastify.log.error('Erro no registro de empresa:', error);
-      
-      return reply.status(500).send({
-        success: false,
-        message: 'Erro interno do servidor',
-        error: error.message
-      });
-    }
-  });
-
-  // Nova rota: Admin adiciona funcionário à sua empresa
-  fastify.post('/auth/add-employee', {
-    preHandler: [authenticate, requireAdmin],
-    schema: {
-      tags: ['Authentication'],
-      summary: 'Adicionar Funcionário à Empresa',
-      description: `
-        Permite que um administrador adicione funcionários à sua empresa.
-        
-        **👨‍💼 Apenas admins:** Requer token de administrador válido
-        **🔒 Segurança:** Funcionário é automaticamente associado à empresa do admin
-        **📧 Login:** Funcionário pode fazer login com email e senha fornecidos
-        **🎯 Próximo passo:** Use /employees/{id}/skills para atribuir serviços
-      `,
-      security: [{ bearerAuth: [] }],
-      body: {
-        type: 'object',
-        properties: {
-          email: { 
-            type: 'string', 
-            format: 'email',
-            description: 'Email pessoal do funcionário para login'
-          },
-          password: { 
-            type: 'string', 
-            minLength: 6,
-            description: 'Senha temporária para o funcionário'
-          },
-          name: { 
-            type: 'string', 
-            minLength: 2,
-            description: 'Nome completo do funcionário'
-          },
-          phone: { 
-            type: 'string',
-            description: 'Telefone de contato (opcional)'
-          },
-          position: { 
-            type: 'string',
-            description: 'Cargo ou função (ex: Barbeiro Sênior, Cabeleireira, etc.)'
-          }
-        },
-        required: ['email', 'password', 'name']
-      },
-      response: {
-        201: {
-          ...responses[201],
-          properties: {
-            ...responses[201].properties,
-            data: {
-              type: 'object',
-              properties: {
-                employee: userSchema,
-                loginInstructions: { 
-                  type: 'string',
-                  description: 'Instruções de login para o funcionário'
-                }
-              }
-            }
-          }
-        },
-        400: responses[400],
-        401: responses[401],
-        403: responses[403],
-        409: responses[409],
-        500: responses[500]
-      }
-    }
-  }, async (request, reply) => {
-    try {
-      const { email, password, name, phone, position } = request.body as any;
-      const admin = (request as any).user;
-
-      // Verificar se admin está associado a uma empresa
-      if (!admin?.enterpriseEmail) {
-        return reply.status(403).send({
-          success: false,
-          message: 'Administrador não está associado a nenhuma empresa',
-          error: 'Acesso negado'
-        });
-      }
-
-      // Criar funcionário associado à empresa do admin
-      const employeeResult = await authService.registerUser(
-        email,
-        password,
-        name,
-        'employee', // Nova role específica para funcionários
-        admin.enterpriseEmail, // Usa a empresa do admin logado
-        phone
-      );
-
-      if (!employeeResult.success) {
-        return reply.status(400).send({
-          success: false,
-          message: 'Falha ao criar funcionário',
-          error: employeeResult.error
-        });
-      }
-
-      // Adicionar informações específicas do funcionário
-      if (position) {
-        // TODO: Salvar posição/cargo em uma subcoleção ou campo adicional
-      }
-
-      return reply.status(201).send({
-        success: true,
-        message: 'Funcionário adicionado com sucesso',
-        data: {
-          employee: employeeResult.data,
-          loginInstructions: `O funcionário pode fazer login usando:
-Email: ${email}
-Senha: (senha fornecida)
-Sistema: ${process.env.NODE_ENV === 'production' ? 'https://app.barbearia.com' : 'http://localhost:3000'}`
-        }
-      });
-
-    } catch (error: any) {
-      fastify.log.error('Erro ao adicionar funcionário:', error);
       
       return reply.status(500).send({
         success: false,

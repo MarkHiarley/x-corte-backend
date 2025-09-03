@@ -4,11 +4,10 @@ import { authenticate, requireAdmin } from '../middleware/auth.js';
 import { productSchema, responses } from '../schemas/index.js';
 
 export async function productRoutes(fastify: FastifyInstance) {
-  // Rota pública para visualizar produtos da empresa (sem autenticação)
-  fastify.get('/products/:enterpriseEmail', {
+  fastify.get('/products/public/:enterpriseEmail', {
     schema: {
       tags: ['Products'],
-      summary: 'Listar produtos/serviços (público)',
+      summary: '      const result = await productService.getAllProducts(user.enterpriseEmail);star produtos/serviços (público)',
       description: 'Retorna todos os produtos/serviços ativos de uma empresa específica. Rota pública, não requer autenticação.',
       params: {
         type: 'object',
@@ -56,7 +55,6 @@ export async function productRoutes(fastify: FastifyInstance) {
     try {
       const { enterpriseEmail } = request.params as { enterpriseEmail: string };
       
-      // Validar formato do email da empresa
       if (!enterpriseEmail || !enterpriseEmail.includes('@')) {
         return reply.status(400).send({
           success: false,
@@ -65,7 +63,6 @@ export async function productRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // Buscar produtos ativos da empresa (rota pública)
       const result = await productService.getActiveProducts(enterpriseEmail);
       
       if (result.success) {
@@ -142,7 +139,6 @@ export async function productRoutes(fastify: FastifyInstance) {
       const body = request.body as any;
       const user = (request as any).user;
 
-      // Validação de segurança: usuário deve estar associado a uma empresa
       if (!user?.enterpriseEmail) {
         return reply.status(403).send({
           success: false,
@@ -151,7 +147,6 @@ export async function productRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // Validações dos dados obrigatórios
       if (!body.name || !body.price || !body.duration) {
         return reply.status(400).send({
           success: false,
@@ -173,9 +168,8 @@ export async function productRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // Usar o enterpriseEmail do token JWT - mais seguro!
       const result = await productService.createProduct(
-        user.enterpriseEmail, // Sempre usa o email da empresa do usuário autenticado
+        user.enterpriseEmail,
         {
           name: body.name,
           price: body.price,
@@ -367,7 +361,6 @@ export async function productRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Rota administrativa para gerenciar produtos (incluindo inativos)
   fastify.get('/admin/products', {
     preHandler: [authenticate, requireAdmin],
     schema: {
@@ -410,7 +403,6 @@ export async function productRoutes(fastify: FastifyInstance) {
     try {
       const user = (request as any).user;
       
-      // Validação de segurança: usuário deve estar associado a uma empresa
       if (!user?.enterpriseEmail) {
         return reply.status(403).send({
           success: false,

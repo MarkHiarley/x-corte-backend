@@ -45,23 +45,13 @@ class EmployeeService {
 
   async createEmployee(employee: Employee): Promise<{ success: boolean; data?: Employee; error?: string; message?: string }> {
     try {
-      logInfo('createEmployee', `Tentando criar funcionário: ${employee.email}`, { enterpriseEmail: employee.enterpriseEmail });
-
-      // Verificar se já existe funcionário com mesmo email na empresa
-      const existingEmployee = await this.getEmployeeByEmail(employee.enterpriseEmail, employee.email);
-      if (existingEmployee.success && existingEmployee.data) {
-        logInfo('createEmployee', 'Funcionário já existe', { email: employee.email });
-        return {
-          success: false,
-          message: standardMessages.employeeAlreadyExists,
-          error: `Funcionário com email ${employee.email} já existe na empresa`
-        };
-      }
+      logInfo('createEmployee', `Tentando criar funcionário: ${employee.name}`, { enterpriseEmail: employee.enterpriseEmail });
 
       const employeeData = {
         ...employee,
         skills: employee.skills || [],
         workSchedule: employee.workSchedule || {},
+        isActive: employee.isActive !== false, // Default true
         createdAt: new Date(),
         updatedAt: new Date()
       };
@@ -76,14 +66,14 @@ class EmployeeService {
       
       return {
         success: true,
-        message: standardMessages.employeeCreated,
+        message: 'Funcionário criado com sucesso',
         data: newEmployee
       };
     } catch (error: any) {
-      logError('createEmployee', error, { email: employee.email, enterpriseEmail: employee.enterpriseEmail });
+      logError('createEmployee', error, { name: employee.name, enterpriseEmail: employee.enterpriseEmail });
       return {
         success: false,
-        message: standardMessages.internalError,
+        message: 'Erro interno do servidor',
         error: error.message
       };
     }
@@ -115,8 +105,7 @@ class EmployeeService {
 
       const q = query(
         collection(db, this.collectionName),
-        where('enterpriseEmail', '==', enterpriseEmail),
-        orderBy('name') // Ordenar por nome para melhor UX
+        where('enterpriseEmail', '==', enterpriseEmail)
       );
       
       const querySnapshot = await getDocs(q);
@@ -139,7 +128,6 @@ class EmployeeService {
           employees.push({ 
             id: doc.id, 
             name: data.name || '',
-            email: data.email || '',
             phone: data.phone || '',
             position: data.position || '',
             isActive: data.isActive !== false,
@@ -152,7 +140,6 @@ class EmployeeService {
               canPerform: skill.canPerform,
               experienceLevel: skill.experienceLevel
             })) || [],
-            hireDate: data.hireDate?.toDate() || new Date(),
             createdAt: data.createdAt?.toDate() || new Date(),
             updatedAt: data.updatedAt?.toDate() || new Date()
           } as Employee);
@@ -227,7 +214,6 @@ class EmployeeService {
         const employee = { 
           id: docSnap.id, 
           name: data.name || '',
-          email: data.email || '',
           phone: data.phone || '',
           position: data.position || '',
           isActive: data.isActive !== false,
@@ -235,7 +221,6 @@ class EmployeeService {
           avatar: data.avatar || '',
           skills: data.skills || [],
           workSchedule: data.workSchedule || {},
-          hireDate: data.hireDate?.toDate() || new Date(),
           createdAt: data.createdAt?.toDate() || new Date(),
           updatedAt: data.updatedAt?.toDate() || new Date()
         } as Employee;
@@ -258,37 +243,6 @@ class EmployeeService {
       }
     } catch (error: any) {
       console.error('Erro ao buscar funcionário:', error);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  }
-
-  async getEmployeeByEmail(enterpriseEmail: string, email: string): Promise<{ success: boolean; data?: Employee; error?: string }> {
-    try {
-      const q = query(
-        collection(db, this.collectionName),
-        where('enterpriseEmail', '==', enterpriseEmail),
-        where('email', '==', email)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      
-      if (!querySnapshot.empty) {
-        const doc = querySnapshot.docs[0];
-        return {
-          success: true,
-          data: { id: doc.id, ...doc.data() } as Employee
-        };
-      } else {
-        return {
-          success: false,
-          error: 'Funcionário não encontrado'
-        };
-      }
-    } catch (error: any) {
-      console.error('Erro ao buscar funcionário por email:', error);
       return {
         success: false,
         error: error.message
@@ -455,11 +409,11 @@ class EmployeeService {
       const optimizedEmployees = employeesWithSkill.map(employee => ({
         id: employee.id,
         name: employee.name,
-        email: employee.email,
         position: employee.position,
         avatar: employee.avatar,
         enterpriseEmail: employee.enterpriseEmail,
         isActive: employee.isActive,
+        phone: employee.phone,
         // Incluir apenas a skill relevante
         skills: employee.skills?.filter(skill => skill.productId === productId) || []
       })) as Employee[];

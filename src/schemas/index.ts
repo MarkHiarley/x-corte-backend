@@ -1,4 +1,4 @@
- // Schemas reutilizáveis para documentação Swagger
+// Schemas reutilizáveis para documentação Swagger
 
 // Schema base para respostas da API
 export const baseApiResponse = {
@@ -178,7 +178,7 @@ export const responses = {
     description: 'Conflito - recurso já existe ou violação de integridade',
     example: {
       success: false,
-      message: 'Funcionário com este email já existe',
+      message: 'Funcionário com este nome já existe na empresa',
       error: 'Conflito de dados'
     }
   },
@@ -288,9 +288,17 @@ export const userSchema = {
     uid: { type: 'string', description: 'ID único do usuário no Firebase' },
     email: { type: 'string', format: 'email' },
     name: { type: 'string' },
-    role: { type: 'string', enum: ['admin', 'client', 'employee'] },
+    role: { 
+      type: 'string', 
+      enum: ['admin', 'client'],
+      description: 'Role do usuário: admin (gerencia empresa) ou client (faz agendamentos)'
+    },
     phone: { type: 'string' },
-    enterpriseEmail: { type: 'string', format: 'email', description: 'Email da empresa (para admins e funcionários)' },
+    enterpriseEmail: { 
+      type: 'string', 
+      format: 'email', 
+      description: 'Email da empresa (obrigatório para admins)'
+    },
     createdAt: { type: 'string', format: 'date-time' },
     updatedAt: { type: 'string', format: 'date-time' }
   }
@@ -353,7 +361,7 @@ export const bookingSchema = {
     status: { 
       type: 'string', 
       enum: ['pending', 'confirmed', 'cancelled', 'completed'],
-      description: 'Status do agendamento'
+      description: 'Status do agendamento: pending (aguardando), confirmed (confirmado), cancelled (cancelado - preserva histórico), completed (realizado)'
     },
     notes: { type: 'string', description: 'Observações do agendamento' },
     createdAt: { type: 'string', format: 'date-time' },
@@ -461,7 +469,7 @@ export const employeeSchema = {
     enterpriseEmail: { 
       type: 'string', 
       format: 'email',
-      description: 'Email da empresa'
+      description: 'Email da empresa à qual o funcionário pertence'
     },
     name: { 
       type: 'string', 
@@ -469,35 +477,25 @@ export const employeeSchema = {
       maxLength: 100,
       description: 'Nome completo do funcionário'
     },
-    email: { 
-      type: 'string', 
-      format: 'email',
-      description: 'Email pessoal do funcionário'
-    },
     phone: { 
       type: 'string',
-      description: 'Telefone de contato'
+      description: 'Telefone de contato (opcional)'
     },
     position: { 
       type: 'string',
       description: 'Cargo: Barbeiro, Cabeleireira, Manicure, etc'
     },
-    hireDate: { 
-      type: 'string', 
-      format: 'date',
-      description: 'Data de contratação'
-    },
     isActive: { 
       type: 'boolean',
-      description: 'Se o funcionário está ativo'
+      description: 'Se o funcionário está ativo (funcionários não fazem login próprio)'
     },
     avatar: { 
       type: 'string',
-      description: 'URL da foto do funcionário'
+      description: 'URL da foto do funcionário (opcional)'
     },
     skills: {
       type: 'array',
-      description: 'Serviços que o funcionário sabe realizar',
+      description: 'Serviços/produtos que o funcionário sabe realizar',
       items: {
         type: 'object',
         properties: {
@@ -519,7 +517,7 @@ export const employeeSchema = {
             description: 'Se o funcionário pode realizar este serviço'
           }
         },
-        required: ['productId', 'productName', 'experienceLevel']
+        required: ['productId', 'productName', 'experienceLevel', 'canPerform']
       }
     },
     workSchedule: {
@@ -601,5 +599,143 @@ export const employeeSchema = {
     createdAt: { type: 'string', format: 'date-time' },
     updatedAt: { type: 'string', format: 'date-time' }
   },
-  required: ['enterpriseEmail', 'name', 'email', 'position', 'isActive']
+  required: ['enterpriseEmail', 'name', 'position', 'isActive']
+};
+
+// Schemas específicos para endpoints atualizados
+
+// Schema para registro de empresa (unificado)
+export const enterpriseRegistrationSchema = {
+  type: 'object',
+  properties: {
+    email: { 
+      type: 'string', 
+      format: 'email',
+      description: 'Email da empresa (será usado para login do admin)'
+    },
+    password: { 
+      type: 'string', 
+      minLength: 6,
+      description: 'Senha do administrador'
+    },
+    name: { 
+      type: 'string',
+      minLength: 2,
+      description: 'Nome do administrador'
+    },
+    enterpriseName: { 
+      type: 'string',
+      minLength: 2,
+      description: 'Nome da empresa'
+    },
+    phone: { 
+      type: 'string',
+      description: 'Telefone da empresa (opcional)'
+    },
+    address: { 
+      type: 'string',
+      description: 'Endereço da empresa (opcional)'
+    }
+  },
+  required: ['email', 'password', 'name', 'enterpriseName']
+};
+
+// Schema para funcionário disponível (resposta da API)
+export const availableEmployeeSchema = {
+  type: 'object',
+  properties: {
+    id: { type: 'string', description: 'ID do funcionário' },
+    name: { type: 'string', description: 'Nome do funcionário' },
+    position: { type: 'string', description: 'Cargo do funcionário' },
+    available: { type: 'boolean', enum: [true], description: 'Sempre true (já filtrado)' },
+    experienceLevel: { 
+      type: 'string',
+      enum: ['iniciante', 'intermediario', 'avancado', 'especialista'],
+      description: 'Nível de experiência para o serviço específico'
+    },
+    estimatedDuration: { type: 'number', description: 'Duração estimada baseada no produto' },
+    customDuration: { type: 'number', description: 'Duração personalizada do funcionário' },
+    price: { type: 'number', description: 'Preço do serviço (sempre igual ao produto)' },
+    duration: { type: 'number', description: 'Duração padrão do produto' }
+  }
+};
+
+// Schema para criação de agendamento (atualizado)
+export const createBookingSchema = {
+  type: 'object',
+  properties: {
+    enterpriseEmail: {
+      type: 'string',
+      format: 'email',
+      description: 'Email da empresa'
+    },
+    clientName: {
+      type: 'string',
+      minLength: 2,
+      description: 'Nome do cliente'
+    },
+    clientPhone: {
+      type: 'string',
+      description: 'Telefone do cliente'
+    },
+    clientEmail: {
+      type: 'string',
+      format: 'email',
+      description: 'Email do cliente (opcional)'
+    },
+    productId: {
+      type: 'string',
+      description: 'ID do produto/serviço'
+    },
+    employeeId: {
+      type: 'string',
+      description: 'ID do funcionário específico (opcional). Se não informado, agenda sem funcionário específico'
+    },
+    date: {
+      type: 'string',
+      format: 'date',
+      description: 'Data do agendamento (YYYY-MM-DD)'
+    },
+    startTime: {
+      type: 'string',
+      pattern: '^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$',
+      description: 'Horário de início (HH:MM)'
+    },
+    notes: {
+      type: 'string',
+      description: 'Observações do agendamento (opcional)'
+    }
+  },
+  required: ['enterpriseEmail', 'clientName', 'clientPhone', 'productId', 'date', 'startTime']
+};
+
+// Schema para funcionário simplificado (sem email)
+export const createEmployeeSchema = {
+  type: 'object',
+  properties: {
+    name: {
+      type: 'string',
+      minLength: 2,
+      maxLength: 100,
+      description: 'Nome completo do funcionário'
+    },
+    phone: {
+      type: 'string',
+      description: 'Telefone de contato (opcional)'
+    },
+    position: {
+      type: 'string',
+      description: 'Cargo: Barbeiro, Cabeleireira, Manicure, etc'
+    },
+    isActive: {
+      type: 'boolean',
+      default: true,
+      description: 'Se o funcionário está ativo'
+    },
+    avatar: {
+      type: 'string',
+      description: 'URL da foto do funcionário (opcional)'
+    }
+  },
+  required: ['name', 'position']
 };

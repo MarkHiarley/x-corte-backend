@@ -6,8 +6,8 @@ import { responses } from '../schemas/index.js';
 
 interface GetTimeSlotsQuery {
   employeeId: string;
-  date: string; // YYYY-MM-DD
-  duration?: number; // em minutos
+  date: string;
+  duration?: number;
 }
 
 interface GetAvailableEmployeesQuery {
@@ -27,7 +27,6 @@ interface CheckAvailabilityBody {
 
 export async function employeeAvailabilityRoutes(fastify: FastifyInstance) {
   
-  // Buscar horários disponíveis de um funcionário específico
   fastify.get<{
     Querystring: GetTimeSlotsQuery;
   }>('/employees/availability/slots', {
@@ -351,7 +350,7 @@ export async function employeeAvailabilityRoutes(fastify: FastifyInstance) {
             position: employee.position,
             experienceLevel: skill?.experienceLevel || 'intermediario',
             estimatedPrice: skill?.priceMultiplier ? 
-              Math.round((skill.priceMultiplier * 50) * 100) / 100 : // Assumindo preço base de 50
+              Math.round((skill.priceMultiplier * 50) * 100) / 100 :
               50,
             estimatedDuration: duration || 30,
             avatar: employee.avatar
@@ -482,8 +481,7 @@ export async function employeeAvailabilityRoutes(fastify: FastifyInstance) {
       const basePrice = productResult.success && productResult.data ? productResult.data.price : 0;
       const baseDuration = productResult.success && productResult.data ? productResult.data.duration : 30;
 
-      // Calcular valores (sem multiplicador de preço)
-      const price = basePrice; // Preço sempre igual ao do produto
+      const price = basePrice;
       const customDuration = baseDuration;
 
       // Buscar horários disponíveis

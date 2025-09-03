@@ -14,8 +14,8 @@ export interface UserProfile {
   uid: string;
   email: string;
   name: string;
-  role: 'admin' | 'client' | 'employee';
-  enterpriseEmail?: string; // Para admins e funcionários
+  role: 'admin' | 'client';
+  enterpriseEmail?: string;
   phone?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -26,7 +26,7 @@ export const authService = {
     email: string, 
     password: string, 
     name: string, 
-    role: 'admin' | 'client' | 'employee',
+    role: 'admin' | 'client',
     enterpriseEmail?: string,
     phone?: string
   ): Promise<ApiResponse<UserProfile>> {
@@ -40,7 +40,7 @@ export const authService = {
         email: user.email!,
         name,
         role,
-        ...((role === 'admin' || role === 'employee') && enterpriseEmail && { enterpriseEmail }),
+        ...(role === 'admin' && enterpriseEmail && { enterpriseEmail }),
         ...(phone && { phone }),
         createdAt: new Date(),
         updatedAt: new Date()
@@ -163,7 +163,6 @@ export const authService = {
 
   async verifyToken(_token: string): Promise<ApiResponse<{valid: boolean}>> {
     try {
-      // TODO: Implementar verificação real do token
       logInfo('verifyToken', 'Token verificado');
       return createSuccessResponse(
         'Token válido',

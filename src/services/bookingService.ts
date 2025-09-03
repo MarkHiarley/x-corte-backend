@@ -63,7 +63,20 @@ export const bookingService = {
 
             const snapshot = await getDocs(bookingsQuery);
             const bookings = snapshot.docs
-                .map(d => ({ id: d.id, ...(d.data() as any) }))
+                .map(d => {
+                    const data = d.data();
+                    return {
+                        id: d.id,
+                        ...data,
+                        // Converter Timestamps para strings ISO
+                        createdAt: data.createdAt && typeof data.createdAt.toDate === 'function' 
+                            ? data.createdAt.toDate().toISOString() 
+                            : data.createdAt,
+                        updatedAt: data.updatedAt && typeof data.updatedAt.toDate === 'function'
+                            ? data.updatedAt.toDate().toISOString()
+                            : data.updatedAt
+                    };
+                })
                 .filter((b: any) => ['confirmed', 'pending'].includes(b.status))
                 .sort((a: any, b: any) => a.startTime.localeCompare(b.startTime));
 
@@ -302,6 +315,56 @@ export const bookingService = {
         }
     },
 
+    async cancelBooking(enterpriseEmail: string, bookingId: string) {
+        try {
+            const bookingRef = doc(db, `enterprises/${enterpriseEmail}/bookings`, bookingId);
+            
+            // Verificar se o agendamento existe antes de cancelar
+            const bookingSnap = await getDoc(bookingRef);
+            if (!bookingSnap.exists()) {
+                return {
+                    success: false,
+                    error: 'Agendamento não encontrado'
+                };
+            }
+
+            const bookingData = bookingSnap.data();
+            
+            // Verificar se o agendamento já está cancelado
+            if (bookingData.status === 'cancelled') {
+                return {
+                    success: false,
+                    error: 'Agendamento já está cancelado'
+                };
+            }
+
+            // Verificar se o agendamento já foi completado
+            if (bookingData.status === 'completed') {
+                return {
+                    success: false,
+                    error: 'Não é possível cancelar um agendamento já completado'
+                };
+            }
+
+            await updateDoc(bookingRef, {
+                status: 'cancelled',
+                updatedAt: Timestamp.now()
+            });
+
+            return {
+                success: true,
+                message: 'Agendamento cancelado com sucesso'
+            };
+
+        } catch (error) {
+            console.error('Erro ao cancelar agendamento:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Erro desconhecido'
+            };
+        }
+    },
+
     async getBookings(
         enterpriseEmail: string,
         date?: string,
@@ -323,10 +386,20 @@ export const bookingService = {
             }
 
             const snapshot = await getDocs(bookingsQuery);
-            let bookings = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
+            let bookings = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    // Converter Timestamps para strings ISO
+                    createdAt: data.createdAt && typeof data.createdAt.toDate === 'function' 
+                        ? data.createdAt.toDate().toISOString() 
+                        : data.createdAt,
+                    updatedAt: data.updatedAt && typeof data.updatedAt.toDate === 'function'
+                        ? data.updatedAt.toDate().toISOString()
+                        : data.updatedAt
+                };
+            });
 
             if (date && status) {
                 bookings = bookings.filter((booking: any) => booking.status === status);
@@ -362,10 +435,16 @@ export const bookingService = {
             );
 
             const snapshot = await getDocs(bookingsQuery);
-            const bookings = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            })) as Booking[];
+            const bookings = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    // Converter Timestamps para strings ISO
+                    createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
+                    updatedAt: data.updatedAt?.toDate?.()?.toISOString() || data.updatedAt
+                };
+            }) as Booking[];
 
             // Filtrar apenas agendamentos não cancelados
             const activeBookings = bookings.filter(booking => 
@@ -393,7 +472,7 @@ export const bookingService = {
             clientPhone: string;
             clientEmail?: string;
             productId: string;
-            employeeId?: string; // Funcionário específico (opcional)
+            employeeId?: string;
             date: string;
             startTime: string;
             notes?: string;
