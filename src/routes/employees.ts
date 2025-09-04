@@ -232,11 +232,6 @@ export async function employeeRoutes(fastify: FastifyInstance) {
             maxLength: 100,
             description: 'Nome completo do funcionário'
           },
-          email: { 
-            type: 'string',
-            format: 'email',
-            description: 'Email pessoal do funcionário'
-          },
           phone: { 
             type: 'string',
             description: 'Telefone de contato'
@@ -272,7 +267,7 @@ export async function employeeRoutes(fastify: FastifyInstance) {
             }
           }
         },
-        required: ['enterpriseEmail', 'name', 'email', 'position']
+        required: ['enterpriseEmail', 'name', 'position']
       },
       response: {
         201: {

@@ -161,7 +161,8 @@ export async function authRoutes(fastify: FastifyInstance) {
       } else {
         return reply.status(401).send({
           success: false,
-          message: result.error
+          message: result.error || 'Credenciais inválidas',
+          error: 'Erro de autenticação'
         });
       }
     } catch (error: any) {
@@ -169,7 +170,8 @@ export async function authRoutes(fastify: FastifyInstance) {
       
       return reply.status(500).send({
         success: false,
-        message: error.message || 'Erro interno do servidor'
+        message: error.message || 'Erro interno do servidor',
+        error: 'Erro interno'
       });
     }
   });
