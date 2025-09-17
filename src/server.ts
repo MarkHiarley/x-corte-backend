@@ -14,6 +14,7 @@ import { schedulesRoutes } from './routes/schedules.js';
 import { authRoutes } from './routes/auth.js';
 import { employeeRoutes } from './routes/employees.js';
 import { employeeAvailabilityRoutes } from './routes/employeeAvailability.js';
+import { whatsAppVerification } from './routes/whatsapp.js';
 
 dotenv.config();
 
@@ -171,6 +172,7 @@ async function setupRoutes() {
   await server.register(schedulesRoutes, { prefix: '/api' });
   await server.register(employeeRoutes, { prefix: '/api' });
   await server.register(employeeAvailabilityRoutes, { prefix: '/api' });
+  await server.register(whatsAppVerification, { prefix: '/api' });
 }
 
 async function start() {
