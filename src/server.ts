@@ -73,7 +73,7 @@ server.setErrorHandler((error, request, reply) => {
 async function setupPlugins() {
   await server.register(cors, {
     origin: process.env.NODE_ENV === 'production' 
-      ? ['https://yourdomain.com'] 
+      ? ['https://agendamentos.codxis.com.br'] 
       : true,
     credentials: true
   });
