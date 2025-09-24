@@ -1,34 +1,56 @@
 import { FastifyInstance } from 'fastify';
 import { bookingService } from '../services/bookingService.js';
 import { bookingSchema, responses } from '../schemas/index.js';
-
+import { sendMessage } from '../services/sendmessage.js'
 export async function bookingRoutes(fastify: FastifyInstance) {
+  async function scheduleReminder(booking: any) {
+    const bookingDateTime = new Date(`${booking.date}T${booking.startTime}:00`);
+    const reminderTime = bookingDateTime.getTime() - 30 * 60 * 1000; // 30 min antes
+    const delay = reminderTime - Date.now();
+
+    if (delay > 0) {
+      setTimeout(async () => {
+        try {
+          // Aqui você dispara a notificação
+          await sendMessage(
+            "55" + booking.clientPhone,
+            `⏰ Olá ${booking.clientName}, lembrete do seu agendamento: ${booking.productName} às ${booking.startTime}.`
+          );
+          console.log(`Lembrete enviado para ${booking.clientName} (${booking.clientPhone})`);
+        } catch (err) {
+          console.error('Erro ao enviar lembrete:', err);
+        }
+      }, delay);
+    } else {
+      console.log("Horário já passou ou muito próximo, não será agendado lembrete.");
+    }
+  }
   fastify.get('/bookings', {
     schema: {
       tags: ['Bookings'],
       summary: 'Listar agendamentos',
       description: 'Retorna todos os agendamentos de uma empresa, com filtros opcionais por data e status.',
       querystring: {
-          type: 'object',
-          properties: {
-            enterpriseEmail: { 
-              type: 'string',
-              format: 'email',
-              description: 'Email da empresa'
-            },
-            date: { 
-              type: 'string',
-              format: 'date',
-              description: 'Filtrar por data específica (YYYY-MM-DD)'
-            },
-            status: { 
-              type: 'string',
-              enum: ['pending', 'confirmed', 'cancelled', 'completed'],
-              description: 'Filtrar por status do agendamento'
-            }
+        type: 'object',
+        properties: {
+          enterpriseEmail: {
+            type: 'string',
+            format: 'email',
+            description: 'Email da empresa'
           },
-          required: ['enterpriseEmail']
+          date: {
+            type: 'string',
+            format: 'date',
+            description: 'Filtrar por data específica (YYYY-MM-DD)'
+          },
+          status: {
+            type: 'string',
+            enum: ['pending', 'confirmed', 'cancelled', 'completed'],
+            description: 'Filtrar por status do agendamento'
+          }
         },
+        required: ['enterpriseEmail']
+      },
       response: {
         200: {
           ...responses[200],
@@ -49,7 +71,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
   }, async (request, reply) => {
     try {
       const { enterpriseEmail, date, status } = request.query as any;
-      
+
       if (!enterpriseEmail) {
         return reply.status(400).send({
           success: false,
@@ -57,9 +79,9 @@ export async function bookingRoutes(fastify: FastifyInstance) {
           error: 'Parâmetro obrigatório'
         });
       }
-      
+
       const result = await bookingService.getBookings(enterpriseEmail, date, status);
-      
+
       if (result.success && 'data' in result) {
         return {
           success: true,
@@ -74,7 +96,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       }
     } catch (error: any) {
       fastify.log.error('Erro na API de agendamentos:', error);
-      
+
       return reply.status(500).send({
         success: false,
         message: error.message || 'Erro interno do servidor',
@@ -105,43 +127,43 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       body: {
         type: 'object',
         properties: {
-          enterpriseEmail: { 
+          enterpriseEmail: {
             type: 'string',
             format: 'email',
             description: 'Email da empresa'
           },
-          clientName: { 
+          clientName: {
             type: 'string',
             description: 'Nome do cliente'
           },
-          clientPhone: { 
+          clientPhone: {
             type: 'string',
             description: 'Telefone do cliente'
           },
-          clientEmail: { 
+          clientEmail: {
             type: 'string',
             format: 'email',
             description: 'Email do cliente (opcional)'
           },
-          productId: { 
+          productId: {
             type: 'string',
             description: 'ID do produto/serviço'
           },
-          employeeId: { 
+          employeeId: {
             type: 'string',
             description: 'ID do funcionário específico (opcional). Se informado, sistema valida se o funcionário pode realizar o serviço.'
           },
-          date: { 
+          date: {
             type: 'string',
             format: 'date',
             description: 'Data do agendamento (YYYY-MM-DD)'
           },
-          startTime: { 
+          startTime: {
             type: 'string',
             pattern: '^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$',
             description: 'Horário de início (HH:MM)'
           },
-          notes: { 
+          notes: {
             type: 'string',
             description: 'Observações do agendamento (opcional)'
           }
@@ -178,6 +200,9 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       });
 
       if (result.success && result.data) {
+
+        scheduleReminder(result.data);
+
         return reply.status(201).send({
           success: true,
           data: result.data,
@@ -192,7 +217,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       }
     } catch (error: any) {
       fastify.log.error('Erro ao criar agendamento:', error);
-      
+
       return reply.status(500).send({
         success: false,
         message: error.message || 'Erro interno do servidor',
@@ -257,7 +282,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       }
     } catch (error: any) {
       fastify.log.error('Erro ao confirmar agendamento:', error);
-      
+
       return reply.status(500).send({
         success: false,
         message: error.message || 'Erro interno do servidor',
@@ -293,7 +318,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       querystring: {
         type: 'object',
         properties: {
-          enterpriseEmail: { 
+          enterpriseEmail: {
             type: 'string',
             format: 'email',
             description: 'Email da empresa'
@@ -340,7 +365,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       }
     } catch (error: any) {
       fastify.log.error('Erro ao cancelar agendamento:', error);
-      
+
       return reply.status(500).send({
         success: false,
         message: error.message || 'Erro interno do servidor',
@@ -357,21 +382,21 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       querystring: {
         type: 'object',
         properties: {
-          enterpriseEmail: { 
+          enterpriseEmail: {
             type: 'string',
             format: 'email',
             description: 'Email da empresa'
           },
-          productId: { 
+          productId: {
             type: 'string',
             description: 'ID do produto/serviço'
           },
-          date: { 
+          date: {
             type: 'string',
             format: 'date',
             description: 'Data desejada (YYYY-MM-DD)'
           },
-          startTime: { 
+          startTime: {
             type: 'string',
             pattern: '^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$',
             description: 'Horário de início desejado (HH:MM)'
@@ -410,17 +435,17 @@ export async function bookingRoutes(fastify: FastifyInstance) {
   }, async (request, reply) => {
     try {
       const { enterpriseEmail, productId, date, startTime } = request.query as any;
-      
+
       // Importar o serviço de disponibilidade de funcionários
       const { employeeAvailabilityService } = await import('../services/employeeAvailabilityService.js');
-      
+
       const result = await employeeAvailabilityService.getAvailableEmployeesForService(
         enterpriseEmail,
         productId,
         date,
         startTime
       );
-      
+
       if (result.success) {
         return {
           success: true,
@@ -435,7 +460,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       }
     } catch (error: any) {
       fastify.log.error('Erro ao buscar funcionários disponíveis:', error);
-      
+
       return reply.status(500).send({
         success: false,
         message: error.message || 'Erro interno do servidor',
