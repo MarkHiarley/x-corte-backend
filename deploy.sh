@@ -1,384 +1,235 @@
 #!/bin/bash
 
-# ========================================
-# 🚀 SCRIPT DE DEPLOY COMPLETO
-# X-Corte Backend com Timezone Brasília
-# ========================================
+# ===================================================
+# 🚀 SCRIPT DE DEPLOY COMPLETO v2
+# X-Corte Backend com Timezone Brasília (Refinado)
+# ===================================================
 
-set -e  # Para na primeira falha
+# Para a execução na primeira falha
+set -e
+# Garante que os pipelines falhem se um comando falhar
+set -o pipefail
 
-# Configurações
-CONTAINER_NAME="x-corte-backend"
-IMAGE_NAME="x-corte-backend:latest"
-PORT=5000
-HEALTH_ENDPOINT="/health"
-MAX_WAIT_TIME=60
-TIMEZONE="America/Sao_Paulo"
+# --- Configurações ---
+readonly CONTAINER_NAME="x-corte-backend"
+readonly IMAGE_NAME="x-corte-backend:latest"
+readonly PORT=5000
+readonly HEALTH_ENDPOINT="/health"
+readonly MAX_WAIT_TIME=60
+readonly TIMEZONE="America/Sao_Paulo" # Fuso horário padrão do Brasil
 
-# Cores para output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+# --- Cores para output ---
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly CYAN='\033[0;36m'
+readonly NC='\033[0m' # No Color
 
-# Função para log colorido
+# --- Funções de Log ---
 log() {
-    echo -e "${CYAN}[$(date +'%H:%M:%S')]${NC} $1"
+    echo -e "${CYAN}[$(date +'%Y-%m-%d %H:%M:%S')]${NC} $1"
 }
-
 error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    echo -e "${RED}[ERRO]${NC} $1" >&2
 }
-
 success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
+    echo -e "${GREEN}[SUCESSO]${NC} $1"
 }
-
 warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
+    echo -e "${YELLOW}[AVISO]${NC} $1"
 }
-
 info() {
     echo -e "${BLUE}[INFO]${NC} $1"
 }
 
-# Função para verificar se comando existe
+# --- Funções Auxiliares ---
 command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Função para aguardar container ficar saudável
-wait_for_health() {
-    local counter=0
-    log "🔍 Aguardando aplicação ficar saudável..."
+# Função de limpeza em caso de falha
+cleanup_on_failure() {
+    error "💥 Deploy falhou na linha $1. Iniciando limpeza..."
+    show_logs_on_failure
     
-    while [ $counter -lt $MAX_WAIT_TIME ]; do
-        if curl -s -f "http://localhost:$PORT$HEALTH_ENDPOINT" >/dev/null 2>&1; then
-            success "✅ Aplicação está saudável!"
-            return 0
-        fi
-        
-        echo -n "."
-        sleep 1
-        counter=$((counter + 1))
-    done
-    
-    error "❌ Timeout aguardando aplicação ficar saudável"
-    return 1
+    if [ "$(docker ps -aq -f name=$CONTAINER_NAME)" ]; then
+        log "🗑️  Removendo container com falha..."
+        docker rm -f "$CONTAINER_NAME"
+    fi
 }
+# Trap para chamar a limpeza em caso de erro
+trap 'cleanup_on_failure $LINENO' ERR
 
-# Função para verificar pré-requisitos
+# --- Funções de Deploy ---
+
 check_prerequisites() {
     log "🔍 Verificando pré-requisitos..."
-    
     if ! command_exists docker; then
-        error "Docker não está instalado!"
+        error "Docker não está instalado ou não está no PATH."
         exit 1
     fi
-    
-    if ! command_exists curl; then
-        warning "curl não está instalado. Algumas verificações serão puladas."
-    fi
-    
-    if ! command_exists jq; then
-        warning "jq não está instalado. Output JSON não será formatado."
-    fi
-    
-    # Verificar se Docker está rodando
     if ! docker info >/dev/null 2>&1; then
-        error "Docker não está rodando!"
+        error "O serviço do Docker não parece estar rodando."
         exit 1
     fi
-    
-    # Verificar se .env existe
-    if [ ! -f .env ]; then
-        warning ".env file não encontrado. Algumas variáveis podem não estar disponíveis."
-    fi
-    
-    # Verificar se Dockerfile existe
     if [ ! -f Dockerfile ]; then
-        error "Dockerfile não encontrado!"
+        error "Dockerfile não encontrado no diretório atual."
         exit 1
     fi
-    
-    success "✅ Pré-requisitos OK"
+    success "✅ Pré-requisitos OK."
 }
 
-# Função para parar container existente
-stop_existing_container() {
-    if [ "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
-        log "🛑 Parando container existente..."
-        
-        # Tentar parar graciosamente
-        docker stop $CONTAINER_NAME --time 30
-        
-        # Verificar se parou
-        if [ "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
-            warning "Container não parou graciosamente, forçando..."
-            docker kill $CONTAINER_NAME
-        fi
-        
-        success "✅ Container parado com sucesso"
-    else
-        info "ℹ️  Nenhum container ativo encontrado"
-    fi
-}
-
-# Função para remover container existente
-remove_existing_container() {
+stop_and_remove_container() {
+    # Usando ps -aq para pegar contêineres parados e ativos
     if [ "$(docker ps -aq -f name=$CONTAINER_NAME)" ]; then
-        log "🗑️  Removendo container existente..."
-        docker rm $CONTAINER_NAME
-        success "✅ Container removido"
+        log "🛑 Parando e removendo container existente..."
+        # -f força a remoção se ele estiver rodando
+        docker rm -f "$CONTAINER_NAME"
+        success "✅ Container anterior removido."
     else
-        info "ℹ️  Nenhum container para remover"
+        info "ℹ️  Nenhum container anterior encontrado."
     fi
 }
 
-# Função para construir imagem
 build_image() {
-    log "🔨 Construindo imagem Docker..."
-    
-    # Limpar cache de build se necessário
+    log "🔨 Construindo imagem Docker ($IMAGE_NAME)..."
+    local build_args=()
     if [ "$1" = "--no-cache" ]; then
-        info "🧹 Construindo sem cache..."
-        docker build -t $IMAGE_NAME . --no-cache
-    else
-        docker build -t $IMAGE_NAME .
+        info "🧹 Construindo sem usar o cache."
+        build_args+=("--no-cache")
     fi
     
-    success "✅ Imagem construída com sucesso"
+    docker build -t "$IMAGE_NAME" "${build_args[@]}" .
+    success "✅ Imagem construída com sucesso."
 }
 
-# Função para criar e iniciar container
 start_container() {
     log "🐳 Iniciando novo container..."
     
-    # Preparar comando docker run
-    DOCKER_CMD="docker run -d \
-        --name $CONTAINER_NAME \
-        -p $PORT:$PORT \
-        -e TZ=$TIMEZONE \
-        -v /etc/timezone:/etc/timezone:ro \
-        -v /etc/localtime:/etc/localtime:ro \
-        --restart unless-stopped"
+    # MELHORIA: Construir o comando em um array para evitar `eval` e problemas com aspas.
+    # É mais seguro e robusto.
+    local docker_run_cmd=(
+        "docker" "run" "-d"
+        "--name" "$CONTAINER_NAME"
+        "-p" "$PORT:$PORT"
+        # MELHORIA: Apenas a variável TZ é necessária.
+        # Isso torna o contêiner independente do fuso horário do host.
+        # Garanta que sua imagem base (no Dockerfile) tenha o pacote `tzdata`.
+        "-e" "TZ=$TIMEZONE"
+        "--restart" "unless-stopped"
+    )
     
-    # Adicionar .env se existir
     if [ -f .env ]; then
-        DOCKER_CMD="$DOCKER_CMD --env-file .env"
-        info "📄 Carregando variáveis do .env"
+        info "📄 Carregando variáveis de ambiente do arquivo .env."
+        docker_run_cmd+=("--env-file" ".env")
     fi
     
-    # Adicionar imagem
-    DOCKER_CMD="$DOCKER_CMD $IMAGE_NAME"
+    docker_run_cmd+=("$IMAGE_NAME")
     
-    # Executar comando
-    eval $DOCKER_CMD
+    # Executa o comando
+    "${docker_run_cmd[@]}"
     
-    success "✅ Container iniciado"
+    success "✅ Container iniciado."
 }
 
-# Função para verificar status do container
 check_container_status() {
     log "⏳ Verificando status do container..."
     sleep 3
     
-    if [ "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
-        success "✅ Container está rodando"
-        
-        # Mostrar informações do container
-        info "📊 Informações do container:"
-        docker ps --filter "name=$CONTAINER_NAME" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-        
-        return 0
-    else
-        error "❌ Container não está rodando"
+    if ! docker ps -q -f "name=$CONTAINER_NAME"; then
+        error "❌ Container não subiu corretamente."
         return 1
     fi
+    
+    success "✅ Container está rodando."
+    info "📊 Informações do container:"
+    docker ps --filter "name=$CONTAINER_NAME" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 }
 
-# Função para verificar timezone
 check_timezone() {
-    log "🌍 Verificando configuração de timezone..."
+    log "🌍 Verificando fuso horário do container..."
     
-    # Timezone do host
-    HOST_TIME=$(date)
-    info "🖥️  Host: $HOST_TIME"
+    # MELHORIA: Verificação mais robusta, pegando a sigla e o offset.
+    # Exemplo de saída esperada: BRT -0300
+    local container_time_details
+    container_time_details=$(docker exec "$CONTAINER_NAME" date +"%Z %z")
     
-    # Timezone do container
-    if CONTAINER_TIME=$(docker exec $CONTAINER_NAME date 2>/dev/null); then
-        info "🐳 Container: $CONTAINER_TIME"
+    info "🐳 Hora no Container: $(docker exec "$CONTAINER_NAME" date)"
+    info "🌍 Detalhes do Fuso: $container_time_details"
+    
+    if [[ "$container_time_details" == *"BRT -0300"* ]] || [[ "$container_time_details" == *"-03 -0300"* ]]; then
+        success "✅ Timezone configurado corretamente para Brasília (BRT / -03:00)."
     else
-        warning "Não foi possível verificar horário do container"
-    fi
-    
-    # Variável TZ do container
-    if CONTAINER_TZ=$(docker exec $CONTAINER_NAME printenv TZ 2>/dev/null); then
-        info "🌍 TZ env: $CONTAINER_TZ"
-    else
-        warning "Variável TZ não definida no container"
-    fi
-    
-    # Verificar se timezone está correto
-    if docker exec $CONTAINER_NAME date | grep -q "\-03"; then
-        success "✅ Timezone configurado corretamente para Brasília"
-    else
-        warning "⚠️  Timezone pode não estar correto"
+        warning "⚠️  O fuso horário do container não parece ser o de Brasília."
     fi
 }
 
-# Função para verificar saúde da aplicação
-check_application_health() {
-    log "🏥 Verificando saúde da aplicação..."
+wait_for_health() {
+    log "❤️  Aguardando aplicação ficar saudável em http://localhost:$PORT$HEALTH_ENDPOINT..."
+    local counter=0
     
-    if command_exists curl; then
-        if wait_for_health; then
-            # Tentar endpoints específicos
-            log "🧪 Testando endpoints..."
-            
-            # Health check
-            if curl -s "http://localhost:$PORT$HEALTH_ENDPOINT" >/dev/null 2>&1; then
-                success "✅ Health endpoint OK"
-            else
-                warning "⚠️  Health endpoint não respondeu"
-            fi
-            
-            # Debug time endpoint (se existir)
-            if curl -s "http://localhost:$PORT/debug/time" >/dev/null 2>&1; then
-                info "🕐 Debug time endpoint disponível"
-                if command_exists jq; then
-                    curl -s "http://localhost:$PORT/debug/time" | jq .
-                else
-                    curl -s "http://localhost:$PORT/debug/time"
-                fi
-            fi
-            
-        else
-            error "❌ Aplicação não ficou saudável no tempo esperado"
-            return 1
+    while [ $counter -lt $MAX_WAIT_TIME ]; do
+        # Usando --fail para que curl retorne um código de erro em caso de falha (4xx, 5xx)
+        if curl --silent --fail "http://localhost:$PORT$HEALTH_ENDPOINT" >/dev/null 2>&1; then
+            success "✅ Aplicação respondeu ao health check!"
+            return 0
         fi
-    else
-        warning "curl não disponível, pulando verificação de saúde"
-        sleep 5  # Aguardar um pouco sem verificação
-    fi
+        echo -n "."
+        sleep 1
+        ((counter++))
+    done
+    
+    error "❌ Timeout! A aplicação não ficou saudável em $MAX_WAIT_TIME segundos."
+    return 1
 }
 
-# Função para mostrar logs se houver falha
 show_logs_on_failure() {
     if [ "$(docker ps -aq -f name=$CONTAINER_NAME)" ]; then
-        error "📋 Logs do container:"
-        docker logs --tail 50 $CONTAINER_NAME
+        error "📋 Exibindo os últimos 50 logs do container:"
+        docker logs --tail 50 "$CONTAINER_NAME"
     fi
 }
 
-# Função para limpeza em caso de falha
-cleanup_on_failure() {
-    error "💥 Deploy falhou, executando limpeza..."
-    
-    show_logs_on_failure
-    
-    if [ "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
-        log "🛑 Parando container com falha..."
-        docker stop $CONTAINER_NAME
-    fi
-    
-    if [ "$(docker ps -aq -f name=$CONTAINER_NAME)" ]; then
-        log "🗑️  Removendo container com falha..."
-        docker rm $CONTAINER_NAME
-    fi
-}
-
-# Função para mostrar informações finais
 show_final_info() {
     success "🎉 Deploy concluído com sucesso!"
     
     echo ""
-    echo "========================================="
-    echo "🌐 APLICAÇÃO DISPONÍVEL EM:"
-    echo "   http://localhost:$PORT"
-    echo ""
-    echo "📚 DOCUMENTAÇÃO DA API:"
-    echo "   http://localhost:$PORT/docs"
-    echo ""
-    echo "🧪 TESTAR LEMBRETES:"
-    echo "   curl \"http://localhost:$PORT/bookings/test-now?phone=11987654321\""
-    echo ""
-    echo "📊 VERIFICAR LEMBRETES ATIVOS:"
-    echo "   curl \"http://localhost:$PORT/bookings/active-reminders\""
-    echo ""
-    echo "🕐 VERIFICAR TIMEZONE:"
-    echo "   curl \"http://localhost:$PORT/debug/time\""
-    echo ""
-    echo "📋 VER LOGS:"
-    echo "   docker logs $CONTAINER_NAME -f"
-    echo "========================================="
+    echo -e "${YELLOW}=======================================================${NC}"
+    echo -e "  ${GREEN}Aplicação X-Corte Backend disponível!${NC}"
+    echo -e "${YELLOW}=======================================================${NC}"
+    echo -e " 🌐 ${CYAN}Endpoint Principal:${NC} http://localhost:$PORT"
+    echo -e " 📚 ${CYAN}Documentação (Swagger):${NC} http://localhost:$PORT/docs"
+    echo -e " 🕐 ${CYAN}Verificar Timezone:${NC} curl http://localhost:$PORT/debug/time"
+    echo -e " 📋 ${CYAN}Ver Logs em tempo real:${NC} docker logs -f $CONTAINER_NAME"
+    echo -e "${YELLOW}=======================================================${NC}"
 }
 
-# Função principal
+# --- Função Principal ---
 main() {
     echo ""
-    echo "========================================="
-    echo "🚀 X-CORTE BACKEND DEPLOYMENT"
-    echo "🌍 Timezone: $TIMEZONE"
-    echo "🐳 Container: $CONTAINER_NAME"
-    echo "🎯 Port: $PORT"
-    echo "========================================="
-    echo ""
+    log "🚀 INICIANDO DEPLOY DO X-CORTE BACKEND 🚀"
     
-    # Trap para limpeza em caso de falha
-    trap cleanup_on_failure ERR
-    
-    # Executar etapas do deploy
     check_prerequisites
-    stop_existing_container
-    remove_existing_container
-    
-    # Build com ou sem cache
-    if [ "$1" = "--no-cache" ]; then
-        build_image --no-cache
-    else
-        build_image
-    fi
-    
+    stop_and_remove_container
+    build_image "$1" # Passa o argumento --no-cache se existir
     start_container
+    check_container_status
+    check_timezone
+    wait_for_health
     
-    # Verificações pós-deploy
-    if check_container_status; then
-        check_timezone
-        check_application_health
-        show_final_info
-    else
-        show_logs_on_failure
-        exit 1
-    fi
+    # Se tudo deu certo, desativa o trap de erro para não executar a limpeza
+    trap - ERR
+    
+    show_final_info
 }
 
-# Verificar argumentos
-case "$1" in
-    -h|--help)
-        echo "Uso: $0 [opções]"
-        echo ""
-        echo "Opções:"
-        echo "  --no-cache    Construir imagem sem usar cache"
-        echo "  -h, --help    Mostrar esta ajuda"
-        echo ""
-        echo "Exemplos:"
-        echo "  $0              # Deploy normal"
-        echo "  $0 --no-cache   # Deploy sem cache"
-        exit 0
-        ;;
-    --no-cache)
-        main --no-cache
-        ;;
-    "")
-        main
-        ;;
-    *)
-        error "Opção inválida: $1"
-        echo "Use $0 --help para ver as opções disponíveis"
-        exit 1
-        ;;
-esac
+# --- Ponto de Entrada do Script ---
+# Permite -h e --help para exibir ajuda
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "Uso: $0 [--no-cache]"
+    echo "  --no-cache: Executa o build da imagem Docker sem utilizar o cache."
+    exit 0
+fi
+
+main "$1"
