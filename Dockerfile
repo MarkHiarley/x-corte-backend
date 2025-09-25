@@ -2,6 +2,11 @@
 
 FROM node:20-alpine
 
+RUN apk add --no-cache tzdata
+
+# Opcional, mas recomendado: defina o fuso horário como padrão na imagem
+ENV TZ="America/Sao_Paulo"
+
 # Instalar wget para health check
 RUN apk add --no-cache wget
 
