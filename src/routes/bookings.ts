@@ -1,30 +1,131 @@
 import { FastifyInstance } from 'fastify';
 import { bookingService } from '../services/bookingService.js';
 import { bookingSchema, responses } from '../schemas/index.js';
-import { sendMessage } from '../services/sendmessage.js'
-export async function bookingRoutes(fastify: FastifyInstance) {
-  async function scheduleReminder(booking: any) {
-    const bookingDateTime = new Date(`${booking.date}T${booking.startTime}:00`);
-    const reminderTime = bookingDateTime.getTime() - 30 * 60 * 1000; // 30 min antes
-    const delay = reminderTime - Date.now();
+import { sendMessage } from '../services/sendmessage.js';
 
-    if (delay > 0) {
-      setTimeout(async () => {
-        try {
-          // Aqui você dispara a notificação
-          await sendMessage(
-            "55" + booking.clientPhone,
-            `⏰ Olá ${booking.clientName}, lembrete do seu agendamento: ${booking.productName} às ${booking.startTime}.`
-          );
-          console.log(`Lembrete enviado para ${booking.clientName} (${booking.clientPhone})`);
-        } catch (err) {
-          console.error('Erro ao enviar lembrete:', err);
+// Armazenamento em memória dos lembretes agendados (em produção, use Redis ou banco)
+const scheduledReminders = new Map<string, NodeJS.Timeout>();
+
+export async function bookingRoutes(fastify: FastifyInstance) {
+  
+  // Função melhorada para agendar lembrete
+  async function scheduleReminder(booking: any) {
+    try {
+      // Criar data completa considerando fuso horário
+      const bookingDateTime = new Date(`${booking.date}T${booking.startTime}:00`);
+      
+      // Log para debug
+      console.log(`📅 Agendamento: ${booking.date} às ${booking.startTime}`);
+      console.log(`🕐 Data/hora do agendamento: ${bookingDateTime.toLocaleString('pt-BR')}`);
+      
+      // 30 minutos antes em milissegundos
+      const reminderTime = bookingDateTime.getTime() - (30 * 60 * 1000);
+      const reminderDate = new Date(reminderTime);
+      
+      console.log(`⏰ Lembrete agendado para: ${reminderDate.toLocaleString('pt-BR')}`);
+      
+      // Calcular delay até o momento do lembrete
+      const delay = reminderTime - Date.now();
+      
+      console.log(`⏱️  Delay: ${Math.round(delay / 1000)} segundos (${Math.round(delay / (1000 * 60))} minutos)`);
+      
+      if (delay > 0) {
+        // Formatar número (garantir formato correto)
+        let phoneNumber = booking.clientPhone;
+        
+        // Remove caracteres não numéricos
+        phoneNumber = phoneNumber.replace(/\D/g, '');
+        
+        // Adiciona código do país se não tiver
+        if (!phoneNumber.startsWith('55')) {
+          phoneNumber = '55' + phoneNumber;
         }
-      }, delay);
-    } else {
-      console.log("Horário já passou ou muito próximo, não será agendado lembrete.");
+        
+        console.log(`📱 Número formatado: ${phoneNumber}`);
+        
+        // Agendar lembrete
+        const timeoutId = setTimeout(async () => {
+          try {
+            const message = `⏰ *Lembrete de Agendamento*\n\nOlá ${booking.clientName}! 👋\n\nSeu agendamento está chegando:\n\n🔸 *Serviço:* ${booking.productName}\n🔸 *Horário:* ${booking.startTime}\n🔸 *Data:* ${new Date(booking.date).toLocaleDateString('pt-BR')}\n\nNos vemos em breve! 😊`;
+            
+            console.log(`📤 Enviando lembrete para ${booking.clientName} (${phoneNumber})`);
+            
+            const result = await sendMessage(phoneNumber, message);
+            
+            console.log(`✅ Lembrete enviado com sucesso:`, result);
+            
+            // Remove da lista de lembretes agendados
+            scheduledReminders.delete(booking.id);
+            
+          } catch (err) {
+            console.error('❌ Erro ao enviar lembrete:', err);
+            
+            // Tentar novamente em 5 minutos
+            setTimeout(async () => {
+              try {
+                console.log(`🔄 Tentativa de reenvio para ${booking.clientName}`);
+                await sendMessage(phoneNumber, `⏰ Lembrete: ${booking.productName} às ${booking.startTime} hoje!`);
+                console.log(`✅ Reenvio bem-sucedido`);
+              } catch (retryErr) {
+                console.error('❌ Falha no reenvio:', retryErr);
+              }
+            }, 5 * 60 * 1000); // 5 minutos
+          }
+        }, delay);
+        
+        // Armazenar referência do timeout para poder cancelar se necessário
+        scheduledReminders.set(booking.id, timeoutId);
+        
+        console.log(`✅ Lembrete agendado com sucesso para ${booking.clientName}`);
+        
+      } else {
+        console.log("⚠️ Horário já passou ou muito próximo, não será agendado lembrete.");
+      }
+      
+    } catch (error) {
+      console.error('❌ Erro ao agendar lembrete:', error);
     }
   }
+
+  // Função para cancelar lembrete
+  function cancelReminder(bookingId: string) {
+    const timeoutId = scheduledReminders.get(bookingId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      scheduledReminders.delete(bookingId);
+      console.log(`🚫 Lembrete cancelado para agendamento ${bookingId}`);
+    }
+  }
+
+  // Função para reagendar lembretes após reinicialização do servidor
+  async function rescheduleExistingReminders(enterpriseEmail: string) {
+    try {
+      console.log('🔄 Reagendando lembretes existentes...');
+      
+      const today = new Date().toISOString().split('T')[0];
+      const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      
+      // Buscar agendamentos de hoje e amanhã que estão confirmados
+      const todayBookings = await bookingService.getBookings(enterpriseEmail, today, 'confirmed');
+      const tomorrowBookings = await bookingService.getBookings(enterpriseEmail, tomorrow, 'confirmed');
+      
+      const allBookings = [
+        ...((todayBookings.success && 'data' in todayBookings) ? (todayBookings.data || []) : []),
+        ...((tomorrowBookings.success && 'data' in tomorrowBookings) ? (tomorrowBookings.data || []) : [])
+      ];
+      
+      for (const booking of allBookings) {
+        await scheduleReminder(booking);
+      }
+      
+      console.log(`✅ ${allBookings.length} lembretes reagendados`);
+      
+    } catch (error) {
+      console.error('❌ Erro ao reagendar lembretes:', error);
+    }
+  }
+
+  // GET /bookings - Listar agendamentos
   fastify.get('/bookings', {
     schema: {
       tags: ['Bookings'],
@@ -88,9 +189,10 @@ export async function bookingRoutes(fastify: FastifyInstance) {
           data: result.data || []
         };
       } else {
+        const errorMessage = ('error' in result && result.error) || 'Erro desconhecido';
         return reply.status(500).send({
           success: false,
-          message: ('error' in result ? result.error : undefined) || 'Erro desconhecido',
+          message: errorMessage,
           error: 'Erro interno'
         });
       }
@@ -105,6 +207,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // POST /bookings - Criar agendamento
   fastify.post('/bookings', {
     schema: {
       tags: ['Bookings'],
@@ -118,6 +221,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         - Se não informado, agenda sem funcionário específico  
         - Preço e duração são sempre os definidos pela empresa no produto
         - Sistema verifica automaticamente disponibilidade de horários
+        - Agenda lembrete automático 30 minutos antes
         
         **🎯 Casos de uso:**
         - Site da empresa com formulário de agendamento
@@ -199,19 +303,22 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         notes: body.notes
       });
 
-      if (result.success && result.data) {
-
-        scheduleReminder(result.data);
+      if (result.success && 'data' in result && result.data) {
+        // Agendar lembrete de forma assíncrona para não bloquear a resposta
+        setImmediate(() => {
+          scheduleReminder(result.data);
+        });
 
         return reply.status(201).send({
           success: true,
           data: result.data,
-          message: 'Agendamento criado com sucesso!'
+          message: 'Agendamento criado com sucesso! Lembrete agendado automaticamente.'
         });
       } else {
+        const errorMessage = ('error' in result && result.error) || 'Erro ao criar agendamento';
         return reply.status(400).send({
           success: false,
-          message: result.error || 'Erro ao criar agendamento',
+          message: errorMessage,
           error: 'Erro de validação'
         });
       }
@@ -226,6 +333,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // PUT /bookings/:id/confirm - Confirmar agendamento
   fastify.put('/bookings/:id/confirm', {
     schema: {
       tags: ['Bookings'],
@@ -269,14 +377,16 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       const result = await bookingService.confirmBooking(enterpriseEmail, id);
 
       if (result.success) {
+        const message = ('message' in result && result.message) || 'Agendamento confirmado com sucesso';
         return {
           success: true,
-          message: result.message
+          message: message
         };
       } else {
+        const errorMessage = ('error' in result && result.error) || 'Erro ao confirmar agendamento';
         return reply.status(500).send({
           success: false,
-          message: result.error || 'Erro ao confirmar agendamento',
+          message: errorMessage,
           error: 'Erro interno'
         });
       }
@@ -291,6 +401,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // PUT /bookings/:id/cancel - Cancelar agendamento
   fastify.put('/bookings/:id/cancel', {
     schema: {
       tags: ['Bookings'],
@@ -302,6 +413,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         **👀 Visibilidade:** Cliente e empresa podem ver agendamentos cancelados na listagem
         **🚫 Restrições:** Não é possível cancelar agendamentos já completados
         **✅ Validações:** Verifica se agendamento existe e não está já cancelado
+        **🔔 Lembretes:** Cancela automaticamente o lembrete agendado
         
         **💡 Casos de uso:**
         - Cliente desiste do agendamento
@@ -351,15 +463,20 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       const result = await bookingService.cancelBooking(enterpriseEmail, id);
 
       if (result.success) {
+        // Cancelar lembrete agendado
+        cancelReminder(id);
+        
+        const message = ('message' in result && result.message) || 'Agendamento cancelado com sucesso';
         return {
           success: true,
-          message: result.message
+          message: message + ' Lembrete cancelado.'
         };
       } else {
-        const statusCode = result.error?.includes('não encontrado') ? 404 : 400;
+        const errorMessage = ('error' in result && result.error) || 'Erro ao cancelar agendamento';
+        const statusCode = errorMessage.includes('não encontrado') ? 404 : 400;
         return reply.status(statusCode).send({
           success: false,
-          message: result.error || 'Erro ao cancelar agendamento',
+          message: errorMessage,
           error: statusCode === 404 ? 'Recurso não encontrado' : 'Erro de validação'
         });
       }
@@ -374,6 +491,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // GET /bookings/available-employees - Listar funcionários disponíveis
   fastify.get('/bookings/available-employees', {
     schema: {
       tags: ['Bookings'],
@@ -452,9 +570,10 @@ export async function bookingRoutes(fastify: FastifyInstance) {
           data: result.data || []
         };
       } else {
+        const errorMessage = ('error' in result && result.error) || 'Erro ao buscar funcionários disponíveis';
         return reply.status(400).send({
           success: false,
-          message: result.error || 'Erro ao buscar funcionários disponíveis',
+          message: errorMessage,
           error: 'Erro de validação'
         });
       }
@@ -467,5 +586,82 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         error: 'Erro interno'
       });
     }
+  });
+
+  // POST /bookings/reschedule-reminders - Reagendar lembretes
+  fastify.post('/bookings/reschedule-reminders', {
+    schema: {
+      tags: ['Bookings'],
+      summary: 'Reagendar lembretes',
+      description: 'Reagenda lembretes para agendamentos existentes (útil após reinicialização do servidor)',
+      body: {
+        type: 'object',
+        properties: {
+          enterpriseEmail: {
+            type: 'string',
+            format: 'email',
+            description: 'Email da empresa'
+          }
+        },
+        required: ['enterpriseEmail']
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            message: { type: 'string' },
+            activeReminders: { type: 'number' }
+          }
+        },
+        500: responses[500]
+      }
+    }
+  }, async (request, reply) => {
+    try {
+      const { enterpriseEmail } = request.body as any;
+      
+      await rescheduleExistingReminders(enterpriseEmail);
+      
+      return {
+        success: true,
+        message: 'Lembretes reagendados com sucesso',
+        activeReminders: scheduledReminders.size
+      };
+    } catch (error: any) {
+      return reply.status(500).send({
+        success: false,
+        message: error.message || 'Erro ao reagendar lembretes',
+        error: 'Erro interno'
+      });
+    }
+  });
+
+  // GET /bookings/active-reminders - Listar lembretes ativos
+  fastify.get('/bookings/active-reminders', {
+    schema: {
+      tags: ['Bookings'],
+      summary: 'Listar lembretes ativos',
+      description: 'Lista todos os lembretes atualmente agendados no sistema',
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            activeReminders: { type: 'number' },
+            reminderIds: {
+              type: 'array',
+              items: { type: 'string' }
+            }
+          }
+        }
+      }
+    }
+  }, async (request, reply) => {
+    return {
+      success: true,
+      activeReminders: scheduledReminders.size,
+      reminderIds: Array.from(scheduledReminders.keys())
+    };
   });
 }
