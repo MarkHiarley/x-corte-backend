@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis-bullmq
+    restart: always
+    ports:
+      - "10000:6379"   # acesso Redis na porta 10000 do host
+    volumes:
+      - ./data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: redis-commander
+    restart: always
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8085:8081"   # acesso painel na porta 8085 do host

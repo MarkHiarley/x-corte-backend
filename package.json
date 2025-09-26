@@ -34,10 +34,12 @@
     "@fastify/rate-limit": "^10.1.1",
     "@fastify/swagger": "^9.1.0",
     "@fastify/swagger-ui": "^5.0.1",
+    "bullmq": "^5.58.8",
     "dotenv": "^16.4.5",
     "fastify": "^5.5.0",
     "firebase": "^12.1.0",
-    "firebase-admin": "^13.4.0"
+    "firebase-admin": "^13.4.0",
+    "ioredis": "^5.8.0"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
