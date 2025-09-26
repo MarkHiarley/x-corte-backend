@@ -71,10 +71,14 @@ server.setErrorHandler((error, request, reply) => {
 });
 
 async function setupPlugins() {
+  // await server.register(cors, {
+  //   origin: process.env.NODE_ENV === 'production' 
+  //     ? [/\.?codxis\.com\.br$/] 
+  //     : true,
+  //   credentials: true
+  // });
   await server.register(cors, {
-    origin: process.env.NODE_ENV === 'production' 
-      ? [/\.?codxis\.com\.br$/] 
-      : true,
+    origin: true,
     credentials: true
   });
 
