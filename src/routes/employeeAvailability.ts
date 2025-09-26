@@ -1,7 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { employeeAvailabilityService } from '../services/employeeAvailabilityService.js';
 import { employeeService } from '../services/employeeService.js';
-import { authenticate } from '../middleware/auth.js';
 import { responses } from '../schemas/index.js';
 
 interface GetTimeSlotsQuery {
@@ -30,7 +29,6 @@ export async function employeeAvailabilityRoutes(fastify: FastifyInstance) {
   fastify.get<{
     Querystring: GetTimeSlotsQuery;
   }>('/employees/availability/slots', {
-    preHandler: [authenticate],
     schema: {
       tags: ['Employee Availability'],
       summary: 'Horários disponíveis do funcionário',
@@ -134,7 +132,7 @@ export async function employeeAvailabilityRoutes(fastify: FastifyInstance) {
   fastify.post<{
     Body: CheckAvailabilityBody;
   }>('/employees/availability/check', {
-    preHandler: [authenticate],
+    
     schema: {
       tags: ['Employee Availability'],
       summary: 'Verificar disponibilidade específica',
@@ -253,8 +251,7 @@ export async function employeeAvailabilityRoutes(fastify: FastifyInstance) {
   // Buscar funcionários disponíveis para um serviço em horário específico
   fastify.get<{
     Querystring: GetAvailableEmployeesQuery;
-  }>('/employees/availability/service', {
-    preHandler: [authenticate],
+  }>('/employees/availability/professionals', {
     schema: {
       tags: ['Employee Availability'],
       summary: 'Funcionários disponíveis para serviço',
@@ -383,7 +380,7 @@ export async function employeeAvailabilityRoutes(fastify: FastifyInstance) {
 
   // Buscar horários disponíveis de um funcionário específico para um serviço
   fastify.get('/employees/:employeeId/availability/service-slots', {
-    preHandler: [authenticate],
+    
     schema: {
       tags: ['Employee Availability'],
       summary: 'Horários disponíveis do funcionário para um serviço específico',
