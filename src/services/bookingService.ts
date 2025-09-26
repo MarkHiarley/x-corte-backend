@@ -98,32 +98,46 @@ export const bookingService = {
         enterpriseEmail: string,
         date: string,
         startTime: string,
-        duration: number
-    ): Promise<{ available: boolean; conflictingBooking?: Booking }> {
+        duration: number,
+        employeeId?: string
+    ): Promise<{ available: boolean; conflictingBooking?: Booking; error?: string }> {
         try {
-            const endTime = this.addMinutesToTime(startTime, duration);
+            // 1. Buscar agendamentos do dia
             const bookingsResult = await this.getBookingsByDate(enterpriseEmail, date);
-            
             if (!bookingsResult.success) {
-                return { available: false };
+                return { 
+                    available: false,
+                    error: 'Erro ao buscar agendamentos'
+                };
             }
 
+            // 2. Calcular minutos para comparação
+            const endTime = this.addMinutesToTime(startTime, duration);
             const bookings = bookingsResult.data || [];
             const newStartMinutes = this.timeToMinutes(startTime);
             const newEndMinutes = this.timeToMinutes(endTime);
 
-            for (const booking of bookings) {
+            // 3. Filtrar agendamentos relevantes
+            const relevantBookings = employeeId
+                ? bookings.filter(b => b.employeeId === employeeId && b.status !== 'cancelled')
+                : bookings.filter(b => b.status !== 'cancelled');
+
+            // 4. Verificar conflitos
+            for (const booking of relevantBookings) {
                 const bookingStartMinutes = this.timeToMinutes(booking.startTime);
                 const bookingEndMinutes = this.timeToMinutes(booking.endTime);
 
-                if (
-                    (newStartMinutes >= bookingStartMinutes && newStartMinutes < bookingEndMinutes) ||
-                    (newEndMinutes > bookingStartMinutes && newEndMinutes <= bookingEndMinutes) ||
-                    (newStartMinutes <= bookingStartMinutes && newEndMinutes >= bookingEndMinutes)
-                ) {
-                    return { 
-                        available: false, 
-                        conflictingBooking: booking 
+                const hasConflict = (
+                    (newStartMinutes >= bookingStartMinutes && newStartMinutes < bookingEndMinutes) || // Novo começa durante existente
+                    (newEndMinutes > bookingStartMinutes && newEndMinutes <= bookingEndMinutes) || // Novo termina durante existente
+                    (newStartMinutes <= bookingStartMinutes && newEndMinutes >= bookingEndMinutes) // Novo engloba existente
+                );
+
+                if (hasConflict) {
+                    return {
+                        available: false,
+                        conflictingBooking: booking,
+                        error: `Conflito com agendamento existente às ${booking.startTime}`
                     };
                 }
             }
@@ -132,7 +146,10 @@ export const bookingService = {
 
         } catch (error) {
             console.error('Erro ao verificar disponibilidade:', error);
-            return { available: false };
+            return { 
+                available: false,
+                error: error instanceof Error ? error.message : 'Erro interno'
+            };
         }
     },
 
@@ -533,19 +550,42 @@ export const bookingService = {
 
                 actualDuration = product.duration;
 
-                // Verificar disponibilidade do funcionário
+                // Verificar disponibilidade do funcionário no horário de trabalho
                 const { employeeAvailabilityService } = await import('./employeeAvailabilityService.js');
-                const availabilityCheck = await employeeAvailabilityService.isEmployeeAvailableAtTime(
+                const workingTimeCheck = await employeeAvailabilityService.isEmployeeWorkingOnTime(
                     bookingData.employeeId,
                     bookingData.date,
                     bookingData.startTime,
                     actualDuration
                 );
 
-                if (!availabilityCheck.success || !availabilityCheck.available) {
+                if (!workingTimeCheck.success) {
                     return {
                         success: false,
-                        error: availabilityCheck.reason || 'Funcionário não disponível neste horário'
+                        error: workingTimeCheck.reason || 'Erro ao verificar disponibilidade'
+                    };
+                }
+
+                if (!workingTimeCheck.available) {
+                    return {
+                        success: false,
+                        error: workingTimeCheck.reason || 'Funcionário não trabalha neste horário'
+                    };
+                }
+
+                // Verificar se já existe agendamento para este funcionário neste horário
+                const availabilityCheck = await this.isTimeSlotAvailable(
+                    enterpriseEmail,
+                    bookingData.date,
+                    bookingData.startTime,
+                    actualDuration,
+                    bookingData.employeeId
+                );
+
+                if (!availabilityCheck.available) {
+                    return {
+                        success: false,
+                        error: availabilityCheck.error || 'Horário não disponível para este funcionário'
                     };
                 }
             } else {
@@ -560,7 +600,7 @@ export const bookingService = {
                 if (!availabilityCheck.available) {
                     return {
                         success: false,
-                        error: 'Horário não disponível'
+                        error: availabilityCheck.error || 'Horário não disponível'
                     };
                 }
             }

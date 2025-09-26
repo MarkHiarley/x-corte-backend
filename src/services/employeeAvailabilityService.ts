@@ -28,6 +28,83 @@ class EmployeeAvailabilityService {
     return daySchedule?.isWorking ? daySchedule : null;
   }
 
+  async isEmployeeWorkingOnTime(
+    employeeId: string,
+    date: string,
+    startTime: string,
+    duration: number
+  ): Promise<{ success: boolean; available?: boolean; reason?: string }> {
+    try {
+      // 1. Buscar dados do funcionário
+      const employeeResult = await employeeService.getEmployeeById(employeeId);
+      if (!employeeResult.success || !employeeResult.data) {
+        return {
+          success: false,
+          reason: 'Funcionário não encontrado'
+        };
+      }
+
+      const employee = employeeResult.data;
+
+      // 2. Verificar dia da semana
+      const weekDays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const dayOfWeek = weekDays[new Date(date).getDay()];
+      const daySchedule = this.isEmployeeWorkingOnDay(employee, dayOfWeek);
+
+      if (!daySchedule) {
+        return {
+          success: true,
+          available: false,
+          reason: 'Funcionário não trabalha neste dia'
+        };
+      }
+
+      // 3. Verificar horário
+      const startMinutes = this.timeToMinutes(startTime);
+      const endMinutes = startMinutes + duration;
+      const workStartMinutes = this.timeToMinutes(daySchedule.startTime || "00:00");
+      const workEndMinutes = this.timeToMinutes(daySchedule.endTime || "00:00");
+
+      if (startMinutes < workStartMinutes || endMinutes > workEndMinutes) {
+        return {
+          success: true,
+          available: false,
+          reason: `Horário fora do expediente (${daySchedule.startTime} - ${daySchedule.endTime})`
+        };
+      }
+
+      // 4. Se tiver intervalo, verificar se não conflita
+      if (daySchedule.breakStart && daySchedule.breakEnd) {
+        const breakStartMinutes = this.timeToMinutes(daySchedule.breakStart);
+        const breakEndMinutes = this.timeToMinutes(daySchedule.breakEnd);
+
+        if (
+          (startMinutes >= breakStartMinutes && startMinutes < breakEndMinutes) ||
+          (endMinutes > breakStartMinutes && endMinutes <= breakEndMinutes) ||
+          (startMinutes <= breakStartMinutes && endMinutes >= breakEndMinutes)
+        ) {
+          return {
+            success: true,
+            available: false,
+            reason: `Horário durante o intervalo (${daySchedule.breakStart} - ${daySchedule.breakEnd})`
+          };
+        }
+      }
+
+      return {
+        success: true,
+        available: true
+      };
+
+    } catch (error) {
+      console.error('Erro ao verificar horário de trabalho:', error);
+      return {
+        success: false,
+        reason: 'Erro ao verificar horário de trabalho'
+      };
+    }
+  }
+
   async generateTimeSlots(
     employeeId: string, 
     date: string,
@@ -153,6 +230,7 @@ class EmployeeAvailabilityService {
     duration: number
   ): Promise<{ success: boolean; available?: boolean; reason?: string; error?: string }> {
     try {
+      // 1. Verificar slots disponíveis do funcionário (horário de trabalho)
       const slotsResult = await this.generateTimeSlots(employeeId, date, duration);
       
       if (!slotsResult.success) {
@@ -163,12 +241,51 @@ class EmployeeAvailabilityService {
       }
 
       const availableSlots = slotsResult.data || [];
-      const isAvailable = availableSlots.includes(startTime);
+      if (!availableSlots.includes(startTime)) {
+        return {
+          success: true,
+          available: false,
+          reason: 'Horário fora do expediente do funcionário'
+        };
+      }
+
+      // 2. Verificar se já existe algum agendamento neste horário
+      const { bookingService } = await import('./bookingService.js');
+      const result = await bookingService.getBookingsByEmployeeAndDate(employeeId, date);
+      
+      if (!result.success) {
+        return {
+          success: false,
+          error: 'Erro ao verificar agendamentos existentes'
+        };
+      }
+
+      const bookings = result.data || [];
+      const startMinutes = this.timeToMinutes(startTime);
+      const endMinutes = startMinutes + duration;
+
+      // Verificar conflito com outros agendamentos
+      for (const booking of bookings) {
+        const bookingStart = this.timeToMinutes(booking.startTime);
+        const bookingEnd = bookingStart + booking.actualDuration;
+
+        if (
+          (startMinutes >= bookingStart && startMinutes < bookingEnd) || // Novo começa durante existente
+          (endMinutes > bookingStart && endMinutes <= bookingEnd) || // Novo termina durante existente
+          (startMinutes <= bookingStart && endMinutes >= bookingEnd) // Novo engloba existente
+        ) {
+          return {
+            success: true,
+            available: false,
+            reason: `Funcionário já possui agendamento às ${booking.startTime}`
+          };
+        }
+      }
 
       return {
         success: true,
-        available: isAvailable,
-        reason: isAvailable ? 'Horário disponível' : 'Horário ocupado ou fora do expediente'
+        available: true,
+        reason: 'Horário disponível'
       };
 
     } catch (error: any) {
