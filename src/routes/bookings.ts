@@ -1,6 +1,4 @@
-// ===================================
-// 📁 src/routes/bookingRoutes.ts (CORRIGIDO)
-// ===================================
+
 import { FastifyInstance } from 'fastify';
 import { bookingService } from '../services/bookingService.js';
 import { bookingSchema, responses } from '../schemas/index.js';
@@ -21,9 +19,9 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     const reminderTime = bookingDateTime.getTime() - (minutesBefore * 60 * 1000);
     const delay = reminderTime - Date.now();
     
-    console.log(`📅 Agendamento: ${bookingDateTime.toLocaleString('pt-BR')}`);
-    console.log(`⏰ Lembrete: ${new Date(reminderTime).toLocaleString('pt-BR')}`);
-    console.log(`⏱️ Delay: ${Math.round(delay / 1000)}s`);
+    console.log(` Agendamento: ${bookingDateTime.toLocaleString('pt-BR')}`);
+    console.log(`Lembrete: ${new Date(reminderTime).toLocaleString('pt-BR')}`);
+    console.log(`⏱ Delay: ${Math.round(delay / 1000)}s`);
     
     return Math.max(0, Math.round(delay / 1000));
   }
@@ -75,7 +73,6 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // POST /bookings - VERSÃO CORRIGIDA
   fastify.post('/bookings', {
     schema: {
       tags: ['Bookings'],
@@ -100,7 +97,6 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     try {
       const body = request.body as any;
 
-      console.log('🔄 Criando agendamento...');
       
       // 1. Criar agendamento
       const result = await bookingService.createBookingWithEmployee(body.enterpriseEmail, {
@@ -144,7 +140,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
               console.log('⚠️ Delay inválido, sem lembrete');
             }
           } catch (reminderError) {
-            console.error('❌ Erro no lembrete:', reminderError);
+            console.error('Erro no lembrete:', reminderError);
             // Continua mesmo com erro no lembrete
           }
 
@@ -154,7 +150,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
             message: 'Agendamento criado com sucesso! Lembrete agendado.'
           });
         } else {
-          console.error('❌ Dados do agendamento inválidos');
+          console.error(' Dados do agendamento inválidos');
           return reply.status(400).send({
             success: false,
             message: 'Dados do agendamento retornados são inválidos'
@@ -163,7 +159,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       } else {
         // Falha na criação do agendamento
         const errorMessage = 'error' in result ? result.error : 'Erro ao criar agendamento';
-        console.error('❌ Falha na criação:', errorMessage);
+        console.error(' Falha na criação:', errorMessage);
         
         return reply.status(400).send({
           success: false,
@@ -171,7 +167,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         });
       }
     } catch (error: any) {
-      console.error('❌ Erro geral:', error);
+      console.error(' Erro geral:', error);
       
       return reply.status(500).send({
         success: false,
@@ -234,7 +230,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         // 2. Cancelar lembrete
         try {
           const reminderCanceled = await cancelSimpleReminder(id);
-          console.log(`📝 Lembrete cancelado: ${reminderCanceled}`);
+          console.log(` Lembrete cancelado: ${reminderCanceled}`);
           
           const message = 'message' in result ? result.message : 'Agendamento cancelado';
           const reminderMsg = reminderCanceled ? ' Lembrete cancelado.' : ' (Lembrete não encontrado)';
@@ -244,7 +240,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
             message: (message || 'Cancelado com sucesso') + reminderMsg
           };
         } catch (reminderError) {
-          console.error('❌ Erro ao cancelar lembrete:', reminderError);
+          console.error('Erro ao cancelar lembrete:', reminderError);
           
           const message = 'message' in result ? result.message : 'Agendamento cancelado';
           return {
