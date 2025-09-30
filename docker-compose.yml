@@ -1,18 +1,15 @@
-
 services:
-
   backend:
+    build: .
     image: x-corte-backend:latest
     container_name: x-corte-backend
     restart: unless-stopped
     ports:
       - "5000:5000"
-  
     env_file:
       - .env
     depends_on:
       - redis
-
   redis:
     image: redis:7.2-alpine
     container_name: redis-bullmq
