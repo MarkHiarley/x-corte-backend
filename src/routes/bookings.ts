@@ -9,12 +9,10 @@ import {
 
 export async function bookingRoutes(fastify: FastifyInstance) {
   
-
   function calculateReminderDelay(date: string, startTime: string): number {
     const isProduction = process.env.NODE_ENV === 'production';
-    const minutesBefore = isProduction ? 30 : 0.5; 
+    const minutesBefore = isProduction ? 30 : 0.5;
 
-    
     const bookingDateTime = new Date(`${date}T${startTime}:00-03:00`);
     const reminderTime = bookingDateTime.getTime() - (minutesBefore * 60 * 1000);
     const delay = reminderTime - Date.now();
@@ -22,13 +20,12 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     return Math.max(0, Math.round(delay / 1000));
   }
 
-
   function createBookingTimestamp(date: string, startTime: string): string {
-    
+
     return `${date}T${startTime}:00-03:00`;
   }
 
-  
+
   fastify.get('/bookings', {
     schema: {
       tags: ['Bookings'],
@@ -74,7 +71,6 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     }
   });
 
-
   fastify.post('/bookings', {
     schema: {
       tags: ['Bookings'],
@@ -99,6 +95,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     try {
       const body = request.body as any;
 
+      
       const result = await bookingService.createBookingWithEmployee(body.enterpriseEmail, {
         clientName: body.clientName,
         clientPhone: body.clientPhone,
@@ -110,22 +107,21 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         notes: body.notes
       });
 
-      console.log('Resultado do agendamento:', { success: result.success });
+      console.log(' Resultado do agendamento:', { success: result.success });
 
       if (result.success && 'data' in result) {
         const bookingData = result.data;
         
         if (bookingData && typeof bookingData === 'object' && 'id' in bookingData) {
-          console.log('Agendamento criado:', bookingData.id);
+          console.log('✅ Agendamento criado:', bookingData.id);
           
-     
           try {
             const delaySeconds = calculateReminderDelay(body.date, body.startTime);
             
             if (delaySeconds > 0) {
-              console.log(' Agendando lembrete...');
+              console.log('Agendando lembrete...');
               
-       
+
               const bookingDateTime = createBookingTimestamp(body.date, body.startTime);
               
               const reminderScheduled = await scheduleSimpleReminder(bookingData.id as string, {
@@ -136,13 +132,13 @@ export async function bookingRoutes(fastify: FastifyInstance) {
                 bookingDateTime: bookingDateTime 
               }, delaySeconds);
               
-              console.log(` Lembrete agendado para: ${bookingDateTime} (delay: ${delaySeconds}s)`);
+              console.log(`Lembrete agendado para: ${bookingDateTime} (delay: ${delaySeconds}s)`);
             } else {
               console.log(' Delay inválido, sem lembrete');
             }
           } catch (reminderError) {
             console.error('Erro no lembrete:', reminderError);
-           
+            
           }
 
           return reply.status(201).send({
@@ -151,7 +147,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
             message: 'Agendamento criado com sucesso! Lembrete agendado.'
           });
         } else {
-          console.error(' Dados do agendamento inválidos');
+          console.error('Dados do agendamento inválidos');
           return reply.status(400).send({
             success: false,
             message: 'Dados do agendamento retornados são inválidos'
@@ -207,7 +203,6 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     }
   });
 
-
   fastify.put('/bookings/:id/cancel', {
     schema: {
       tags: ['Bookings'],
@@ -220,15 +215,16 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       const { id } = request.params as { id: string };
       const { enterpriseEmail } = request.query as { enterpriseEmail: string };
 
-      console.log(`Cancelando agendamento: ${id}`);
+      console.log(` Cancelando agendamento: ${id}`);
+
 
       const result = await bookingService.cancelBooking(enterpriseEmail, id);
 
       if (result.success) {
-       
+    
         try {
           const reminderCanceled = await cancelSimpleReminder(id);
-          console.log(` Lembrete cancelado: ${reminderCanceled}`);
+          console.log(`Lembrete cancelado: ${reminderCanceled}`);
           
           const message = 'message' in result ? result.message : 'Agendamento cancelado';
           const reminderMsg = reminderCanceled ? ' Lembrete cancelado.' : ' (Lembrete não encontrado)';
@@ -262,6 +258,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       });
     }
   });
+
 
   fastify.get('/bookings/available-employees', {
     schema: {
@@ -303,6 +300,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     }
   });
 
+
   fastify.get('/bookings/reminders/active', {
     schema: {
       tags: ['Bookings'],
@@ -324,7 +322,6 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     }
   });
 
-
   fastify.get('/bookings/test-simple', {
     schema: {
       tags: ['Bookings'],
@@ -339,12 +336,33 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     try {
       const { phone } = request.query as any;
       
-      console.log(` Iniciando teste para: ${phone}`);
+      console.log(`🧪 Iniciando teste para: ${phone}`);
       
       const testId = `test-${Date.now()}`;
-   
-      const testDate = new Date(Date.now() + 10000);
-      const testDateTime = testDate.toISOString().replace('Z', '-03:00');
+
+      const now = new Date();
+      const testDate = new Date(now.getTime() + 10000);
+
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+      
+      const parts = formatter.formatToParts(testDate);
+      const year = parts.find(p => p.type === 'year')?.value;
+      const month = parts.find(p => p.type === 'month')?.value;
+      const day = parts.find(p => p.type === 'day')?.value;
+      const hour = parts.find(p => p.type === 'hour')?.value;
+      const minute = parts.find(p => p.type === 'minute')?.value;
+      const second = parts.find(p => p.type === 'second')?.value;
+      
+      const testDateTime = `${year}-${month}-${day}T${hour}:${minute}:${second}-03:00`;
       
       const result = await scheduleSimpleReminder(testId, {
         bookingId: testId,
@@ -352,7 +370,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         clientPhone: phone,
         productName: 'Teste Redis',
         bookingDateTime: testDateTime
-      }, 10); 
+      }, 10); //10s
       
       return {
         success: true,
