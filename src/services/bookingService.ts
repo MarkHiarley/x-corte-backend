@@ -490,6 +490,7 @@ export const bookingService = {
             clientEmail?: string;
             productId: string;
             employeeId?: string;
+            employeeName?: string;
             date: string;
             startTime: string;
             notes?: string;

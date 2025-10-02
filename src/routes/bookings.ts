@@ -84,6 +84,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
           clientEmail: { type: 'string', format: 'email' },
           productId: { type: 'string' },
           employeeId: { type: 'string' },
+          employeeName: { type: 'string' },
           date: { type: 'string', format: 'date' },
           startTime: { type: 'string', pattern: '^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$' },
           notes: { type: 'string' }
@@ -102,6 +103,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         clientEmail: body.clientEmail,
         productId: body.productId,
         employeeId: body.employeeId,
+        employeeName: body.employeeName,
         date: body.date,
         startTime: body.startTime,
         notes: body.notes
